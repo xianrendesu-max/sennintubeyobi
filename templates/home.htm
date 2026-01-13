@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <title>仙人tube home</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <link rel="stylesheet" href="/css/empty.css">
+    <link rel="stylesheet" href="/css/pure-min.css">
+    <link rel="stylesheet" href="/css/grids-responsive-min.css">
+    <link rel="stylesheet" href="/css/ionicons.min.css">
+    <link rel="stylesheet" href="/css/default.css">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css"/>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+    <!-- 追加CSS（上書き用） -->
+    <style>
+        body {
+            background: linear-gradient(180deg, #f8fafc, #eef2ff);
+            font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+            color: #222;
+            min-height: 100vh;
+        }
+
+        /* 中央配置 */
+        #search-widget {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.8s ease;
+        }
+
+        /* ロゴ */
+        #logo h1 {
+            font-size: 48px;
+            letter-spacing: 2px;
+            margin-bottom: 24px;
+            color: #1e3a8a;
+        }
+
+        #logo h1::after {
+            content: "やさしい動画検索";
+            display: block;
+            font-size: 14px;
+            font-weight: normal;
+            color: #64748b;
+            margin-top: 8px;
+        }
+
+        /* 検索バー */
+        .searchbar {
+            width: 100%;
+            max-width: 520px;
+        }
+
+        #searchbox {
+            width: 100%;
+            padding: 16px 22px;
+            font-size: 18px;
+            border-radius: 999px;
+            border: 1px solid #c7d2fe;
+            box-shadow: 0 10px 30px rgba(0,0,0,.08);
+            transition: box-shadow .25s, transform .25s;
+        }
+
+        #searchbox:focus {
+            outline: none;
+            transform: scale(1.03);
+            box-shadow: 0 0 0 4px rgba(99,102,241,.3),
+                        0 18px 40px rgba(0,0,0,.12);
+        }
+
+        /* autocomplete */
+        .ui-autocomplete {
+            border-radius: 14px;
+            box-shadow: 0 12px 30px rgba(0,0,0,.15);
+            padding: 6px;
+            background: white;
+        }
+
+        .ui-menu-item-wrapper {
+            padding: 10px 14px;
+            border-radius: 10px;
+        }
+
+        .ui-state-active {
+            background: #6366f1 !important;
+            color: white !important;
+        }
+
+        /* Toast（通知用） */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #2563eb;
+            color: white;
+            padding: 14px 22px;
+            border-radius: 999px;
+            box-shadow: 0 12px 30px rgba(0,0,0,.25);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all .3s ease;
+            z-index: 999;
+        }
+
+        #toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* アニメーション */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+
+<body class="no-theme">
+
+    <!-- Toast（今後エラーや案内に使える） -->
+    <div id="toast">検索ワードを入力してください</div>
+
+    <div class="pure-g h-box" id="search-widget">
+
+        <div class="pure-u-1" id="logo">
+            <h1>仙人tube</h1>
+        </div>
+
+        <div class="pure-u-1 pure-u-md-12-24 searchbar">
+            <form class="pure-form" action="/search" method="get">
+                <fieldset>
+                    <input
+                        type="search"
+                        id="searchbox"
+                        name="q"
+                        autocomplete="on"
+                        autocorrect="on"
+                        autocapitalize="none"
+                        spellcheck="false"
+                        autofocus
+                        placeholder="動画・チャンネルを検索">
+                </fieldset>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        $('#searchbox').autocomplete({
+            source: function (request, response) {
+                fetch("/suggest?keyword=" + request.term)
+                    .then(res => res.json())
+                    .then(data => response(data));
+            },
+            delay: 300
+        });
+
+        // 空検索防止 + アニメーション
+        document.querySelector("form").addEventListener("submit", function (e) {
+            const box = document.getElementById("searchbox");
+            if (!box.value.trim()) {
+                e.preventDefault();
+                showToast("検索ワードを入力してください");
+                box.focus();
+            }
+        });
+
+        function showToast(text) {
+            const toast = document.getElementById("toast");
+            toast.textContent = text;
+            toast.classList.add("show");
+            setTimeout(() => toast.classList.remove("show"), 2500);
+        }
+    </script>
+
+</body>
+</html>
