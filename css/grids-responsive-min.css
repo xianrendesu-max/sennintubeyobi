@@ -1,0 +1,148 @@
+/* =========================
+   Base
+========================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #f5f6f8;
+  color: #222;
+}
+
+/* =========================
+   Container
+========================= */
+
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* =========================
+   Grid
+========================= */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+/* =========================
+   Column span (default)
+========================= */
+
+.col-1  { grid-column: span 1; }
+.col-2  { grid-column: span 2; }
+.col-3  { grid-column: span 3; }
+.col-4  { grid-column: span 4; }
+.col-5  { grid-column: span 5; }
+.col-6  { grid-column: span 6; }
+.col-7  { grid-column: span 7; }
+.col-8  { grid-column: span 8; }
+.col-9  { grid-column: span 9; }
+.col-10 { grid-column: span 10; }
+.col-11 { grid-column: span 11; }
+.col-12 { grid-column: span 12; }
+
+/* =========================
+   Small (>= 576px)
+========================= */
+
+@media (min-width: 576px) {
+  .sm-1  { grid-column: span 1; }
+  .sm-2  { grid-column: span 2; }
+  .sm-3  { grid-column: span 3; }
+  .sm-4  { grid-column: span 4; }
+  .sm-5  { grid-column: span 5; }
+  .sm-6  { grid-column: span 6; }
+  .sm-7  { grid-column: span 7; }
+  .sm-8  { grid-column: span 8; }
+  .sm-9  { grid-column: span 9; }
+  .sm-10 { grid-column: span 10; }
+  .sm-11 { grid-column: span 11; }
+  .sm-12 { grid-column: span 12; }
+}
+
+/* =========================
+   Medium (>= 768px)
+========================= */
+
+@media (min-width: 768px) {
+  .md-1  { grid-column: span 1; }
+  .md-2  { grid-column: span 2; }
+  .md-3  { grid-column: span 3; }
+  .md-4  { grid-column: span 4; }
+  .md-5  { grid-column: span 5; }
+  .md-6  { grid-column: span 6; }
+  .md-7  { grid-column: span 7; }
+  .md-8  { grid-column: span 8; }
+  .md-9  { grid-column: span 9; }
+  .md-10 { grid-column: span 10; }
+  .md-11 { grid-column: span 11; }
+  .md-12 { grid-column: span 12; }
+}
+
+/* =========================
+   Large (>= 1024px)
+========================= */
+
+@media (min-width: 1024px) {
+  .lg-1  { grid-column: span 1; }
+  .lg-2  { grid-column: span 2; }
+  .lg-3  { grid-column: span 3; }
+  .lg-4  { grid-column: span 4; }
+  .lg-5  { grid-column: span 5; }
+  .lg-6  { grid-column: span 6; }
+  .lg-7  { grid-column: span 7; }
+  .lg-8  { grid-column: span 8; }
+  .lg-9  { grid-column: span 9; }
+  .lg-10 { grid-column: span 10; }
+  .lg-11 { grid-column: span 11; }
+  .lg-12 { grid-column: span 12; }
+}
+
+/* =========================
+   Extra Large (>= 1280px)
+========================= */
+
+@media (min-width: 1280px) {
+  .xl-1  { grid-column: span 1; }
+  .xl-2  { grid-column: span 2; }
+  .xl-3  { grid-column: span 3; }
+  .xl-4  { grid-column: span 4; }
+  .xl-5  { grid-column: span 5; }
+  .xl-6  { grid-column: span 6; }
+  .xl-7  { grid-column: span 7; }
+  .xl-8  { grid-column: span 8; }
+  .xl-9  { grid-column: span 9; }
+  .xl-10 { grid-column: span 10; }
+  .xl-11 { grid-column: span 11; }
+  .xl-12 { grid-column: span 12; }
+}
+
+/* =========================
+   UI Helpers
+========================= */
+
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
