@@ -67,7 +67,9 @@ apis = [
 apichannels = apis.copy()
 apicomments = apis.copy()
 
-os.chmod("./senninverify", 0o755)
+# senninverify に実行権限付与（存在しなくても落ちない）
+if os.path.exists("./senninverify"):
+    os.chmod("./senninverify", 0o755)
 
 session = requests.Session()
 session.headers.update({"User-Agent": "Mozilla/5.0"})
@@ -111,10 +113,8 @@ def api_request_core(api_list, url):
             if res.status_code == 200 and is_json(res.text):
                 return res.text
             else:
-                print(f"APIエラー: {api}")
                 rotate_api(api_list, api)
         except requests.RequestException:
-            print(f"APIタイムアウト: {api}")
             rotate_api(api_list, api)
 
     raise APItimeoutError("APIがタイムアウトしました")
@@ -234,9 +234,25 @@ def get_comments(videoid):
              "body": i["contentHtml"].replace("\n", "<br>")} for i in t]
 
 
+# =========================
+# verify（安全版）
+# =========================
+
 def get_verifycode():
-    result = subprocess.run(["./yukiverify"], encoding="utf-8", stdout=subprocess.PIPE)
-    return result.stdout.strip()
+    if not os.path.exists("./senninverify"):
+        return None
+    try:
+        result = subprocess.run(
+            ["./senninverify"],
+            encoding="utf-8",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+        return result.stdout.strip()
+    except Exception as e:
+        print("verify error:", e)
+        return None
 
 
 # =========================
@@ -285,4 +301,8 @@ def watch(v: str, request: Request, response: Response,
 
 @app.exception_handler(APItimeoutError)
 def api_error(request: Request, exc: APItimeoutError):
-    return templates.TemplateResponse("APIwait.html", {"request": request}, status_code=500)
+    return templates.TemplateResponse(
+        "APIwait.html",
+        {"request": request},
+        status_code=500
+    )
