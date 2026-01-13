@@ -27,11 +27,11 @@ version = "1.0"
 
 apis = [
     "https://yewtu.be/",
-    "https://invidious.adminforge.de/",
+    "https://invidious.f5.si/",
     "https://invidious.perennialte.ch/",
     "https://iv.nboeck.de/",
     "https://invidious.jing.rocks/",
-    "https://inv.nadeko.net/",
+    "https://yt.omada.cafe/",
     "https://invidious.reallyaweso.me/",
     "https://invidious.privacyredirect.com/",
     "https://invidious.nerdvpn.de/",
