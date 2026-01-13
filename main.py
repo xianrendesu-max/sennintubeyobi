@@ -67,7 +67,7 @@ apis = [
 apichannels = apis.copy()
 apicomments = apis.copy()
 
-os.chmod("./yukiverify", 0o755)
+os.chmod("./senninverify", 0o755)
 
 session = requests.Session()
 session.headers.update({"User-Agent": "Mozilla/5.0"})
