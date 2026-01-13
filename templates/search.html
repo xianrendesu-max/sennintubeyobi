@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <title>検索結果 - 仙人tube</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <link rel="stylesheet" href="/css/pure-min.css">
+    <link rel="stylesheet" href="/css/grids-responsive-min.css">
+    <link rel="stylesheet" href="/css/ionicons.min.css">
+    <link rel="stylesheet" href="/css/default.css">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css"/>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+    <!-- UI強化CSS -->
+    <style>
+        body {
+            background: #f6f8fb;
+            font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+            color: #222;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        /* ナビバー */
+        .navbar {
+            background: white;
+            padding: 16px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.06);
+            margin-bottom: 24px;
+            position: sticky;
+            top: 12px;
+            z-index: 10;
+        }
+
+        #searchbox {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 16px;
+            border-radius: 999px;
+            border: 1px solid #ddd;
+            transition: box-shadow .2s, transform .2s;
+        }
+
+        #searchbox:focus {
+            outline: none;
+            transform: scale(1.02);
+            box-shadow: 0 0 0 3px rgba(99,102,241,.3);
+        }
+
+        /* カード */
+        .h-box {
+            background: white;
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 20px;
+            height: 100%;
+            box-shadow: 0 10px 30px rgba(0,0,0,.08);
+            transition: transform .25s, box-shadow .25s;
+            animation: fadeUp .4s ease both;
+        }
+
+        .h-box:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 18px 48px rgba(0,0,0,.15);
+        }
+
+        /* サムネ */
+        .thumbnail {
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+        }
+
+        .thumbnail img {
+            width: 100%;
+            border-radius: 12px;
+            transition: transform .35s;
+        }
+
+        .h-box:hover .thumbnail img {
+            transform: scale(1.05);
+        }
+
+        .length {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0,0,0,.75);
+            color: white;
+            font-size: 12px;
+            padding: 4px 6px;
+            border-radius: 6px;
+        }
+
+        /* タイトル */
+        .h-box p {
+            margin: 10px 0 4px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        /* メタ情報 */
+        .video-card-row {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .video-card-row a {
+            color: #2563eb;
+        }
+
+        /* ページ送り */
+        .pager {
+            margin: 30px 0;
+            text-align: right;
+        }
+
+        .pager a {
+            display: inline-block;
+            background: linear-gradient(135deg, #6366f1, #22d3ee);
+            color: white;
+            padding: 12px 22px;
+            border-radius: 999px;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+            transition: transform .2s, box-shadow .2s;
+        }
+
+        .pager a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 40px rgba(0,0,0,.35);
+        }
+
+        /* autocomplete */
+        .ui-autocomplete {
+            border-radius: 14px;
+            box-shadow: 0 12px 30px rgba(0,0,0,.15);
+            padding: 6px;
+        }
+
+        .ui-state-active {
+            background: #6366f1 !important;
+            color: white !important;
+        }
+
+        /* アニメーション */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+
+<body class="no-theme">
+
+<div class="pure-g">
+    <div class="pure-u-1 pure-u-md-2-24"></div>
+
+    <div class="pure-u-1 pure-u-md-20-24" id="contents">
+
+        <!-- 検索バー -->
+        <div class="pure-g navbar">
+            <div class="pure-u-1 pure-u-md-12-24">
+                <form class="pure-form" action="/search" method="get">
+                    <input
+                        type="search"
+                        id="searchbox"
+                        name="q"
+                        value="{{ word }}"
+                        placeholder="検索">
+                </form>
+            </div>
+        </div>
+
+        <!-- 結果 -->
+        <div class="pure-g">
+            {% for result in results %}
+            <div class="pure-u-1 pure-u-md-1-4">
+                <div class="h-box">
+
+                    {% if result["type"] == "video" %}
+                    <a href="/watch?v={{ result['id'] }}">
+                        <div class="thumbnail">
+                            <img loading="lazy"
+                                 src="{% if proxy == "True" %}/thumbnail?v={{ result['id'] }}{% else %}https://img.youtube.com/vi/{{ result['id'] }}/0.jpg{% endif %}"
+                                 onerror="document.cookie='proxy=True;max-age=2592000;'">
+                            <div class="length">{{result["length"]}}</div>
+                        </div>
+                        <p>{{ result['title'] }}</p>
+                    </a>
+
+                    <div class="video-card-row">
+                        <a href="/channel/{{result['authorId']}}">{{result["author"]}}</a>
+                    </div>
+                    <div class="video-card-row">{{result["published"]}}</div>
+
+                    {% elif result["type"] == "channel" %}
+                    <a href="/channel/{{result["id"]}}">
+                        <center>
+                            <img style="width:60%;border-radius:50%" src="{{result["thumbnail"]}}">
+                        </center>
+                        <p>{{result["author"]}}</p>
+                    </a>
+
+                    {% elif result["type"] == "playlist" %}
+                    <a href="/playlist?list={{result["id"]}}">
+                        <div class="thumbnail">
+                            <img src="https://img.youtube.com/vi/{{ result['thumbnail'] }}/0.jpg">
+                            <div class="length">{{result["count"]}}本</div>
+                        </div>
+                        <p>{{result["title"]}}</p>
+                    </a>
+                    {% endif %}
+
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- ページ送り -->
+        <div class="pager">
+            <a href="{{next}}">次のページ →</a>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    $('#searchbox').autocomplete({
+        source: function (request, response) {
+            fetch("/suggest?keyword=" + request.term)
+                .then(res => res.json())
+                .then(data => response(data));
+        },
+        delay: 300
+    });
+</script>
+
+</body>
+</html>
