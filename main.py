@@ -6,7 +6,7 @@ import datetime
 import random
 import os
 import subprocess
-import concurrent.futures  # ← 追加（これだけ）
+import concurrent.futures
 
 from cache import cache
 
@@ -15,6 +15,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from typing import Union
 
 
@@ -83,7 +85,7 @@ def rotate_api(api_list, api):
 
 
 # =========================
-# ★ 最速勝ちAPI（ここだけ変更）
+# API 最速勝ち
 # =========================
 
 def api_request_core(api_list, url):
@@ -281,3 +283,14 @@ def watch(v: str, request: Request, response: Response,
 @app.exception_handler(APItimeoutError)
 def api_error(request: Request, exc: APItimeoutError):
     return templates.TemplateResponse("APIwait.html", {"request": request}, status_code=500)
+
+
+# =========================
+# ★ 404 Not Found 対策
+# =========================
+
+@app.exception_handler(StarletteHTTPException)
+def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        return RedirectResponse("/")
+    return HTMLResponse(str(exc.detail), status_code=exc.status_code)
