@@ -51,10 +51,11 @@
             box-shadow: 0 0 0 3px rgba(99,102,241,.3);
         }
 
-        /* ===== グリッド（自動調整） ===== */
+        /* ===== グリッド（修正点ここ） ===== */
         .results-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, max-content));
+            justify-content: center;
             gap: 20px;
         }
 
