@@ -1,12 +1,158 @@
-{%for comment in comments%}<div>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comments</title>
+
+<style>
+/* ===== 全体 ===== */
+body {
+    background: #f9fafb;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ===== コメントカード ===== */
+.comment {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.06);
+}
+
+/* ===== アバター ===== */
+.comment-avatar img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* ===== 投稿者 ===== */
+.comment-author {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.comment-author a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.comment-author a:hover {
+    text-decoration: underline;
+}
+
+/* ===== 本文 ===== */
+.comment-body {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #0f172a;
+    white-space: pre-wrap;
+    margin-bottom: 8px;
+}
+
+/* ===== 操作ボタン ===== */
+.comment-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.reply-toggle {
+    background: none;
+    border: none;
+    color: #2563eb;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.reply-toggle:hover {
+    text-decoration: underline;
+}
+
+/* ===== 返信エリア ===== */
+.comment-replies {
+    margin-top: 10px;
+    padding-left: 14px;
+    border-left: 2px solid #e5e7eb;
+    display: none;
+}
+
+.reply-item {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #374151;
+}
+
+/* ===== スマホ対応 ===== */
+@media (max-width: 600px) {
+    .comment {
+        padding: 12px;
+    }
+
+    .comment-avatar img {
+        width: 40px;
+        height: 40px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+{% for comment in comments %}
+<div class="comment">
     <div class="pure-g" style="width:100%">
-        <div class="channel-profile pure-u-4-24 pure-u-md-2-24">
-            <img loading="lazy"style="margin-right:1em;margin-top:1em;width:90%" src="{{comment["authoricon"]}}">
+
+        <div class="comment-avatar pure-u-4-24 pure-u-md-2-24">
+            <img loading="lazy" src="{{ comment["authoricon"] }}">
         </div>
+
         <div class="pure-u-20-24 pure-u-md-22-24">
-            <p><b><a class="" href="/channel/{{comment["authorid"]}}">{{comment["author"]}}</a></b></p>
-            <p style="white-space:pre-wrap">{{comment["body"] | safe}}</p>
-            <div id="replies"></div>
+
+            <div class="comment-author">
+                <a href="/channel/{{ comment["authorid"] }}">
+                    {{ comment["author"] }}
+                </a>
+            </div>
+
+            <div class="comment-body">
+                {{ comment["body"] | safe }}
+            </div>
+
+            <div class="comment-actions">
+                <button class="reply-toggle" onclick="toggleReplies(this)">
+                    返信を表示
+                </button>
+            </div>
+
+            <div class="comment-replies">
+                <!-- ここに返信を入れる（将来用） -->
+                <div class="reply-item">返信サンプル1</div>
+                <div class="reply-item">返信サンプル2</div>
+            </div>
+
         </div>
     </div>
-</div>{%endfor%}
+</div>
+{% endfor %}
+
+<script>
+function toggleReplies(button) {
+    const replies = button.parentElement.nextElementSibling;
+
+    if (replies.style.display === "block") {
+        replies.style.display = "none";
+        button.textContent = "返信を表示";
+    } else {
+        replies.style.display = "block";
+        button.textContent = "返信を非表示";
+    }
+}
+</script>
+
+</body>
+</html>
