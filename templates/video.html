@@ -228,6 +228,7 @@
 
 <script>
 const urls = {{ videourls | tojson }};
+const hlsUrl = {{ hls_url | tojson }};
 const video = document.getElementById("videoPlayer");
 let hls = null;
 
@@ -240,18 +241,18 @@ document.getElementById("qualitySelect").addEventListener("change", e => {
 
     /* ▼ 高画質 → HLS */
     if(index === "0"){
-        if(Hls.isSupported()){
+        if(hlsUrl && Hls.isSupported()){
             if(hls){
                 hls.destroy();
             }
             hls = new Hls();
-            hls.loadSource(urls[0]);
+            hls.loadSource(hlsUrl);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function () {
                 video.play();
             });
-        }else if(video.canPlayType("application/vnd.apple.mpegurl")){
-            video.src = urls[0];
+        }else if(hlsUrl && video.canPlayType("application/vnd.apple.mpegurl")){
+            video.src = hlsUrl;
             video.play();
         }
     }
@@ -282,4 +283,4 @@ function setMode(mode){
 </script>
 
 </body>
-        </html>
+</html>
