@@ -11,8 +11,8 @@
     <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 
-    <!-- ▼ HLS.js -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- ▼ dash.js（高画質用） -->
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
 
     <style>
         body {
@@ -206,39 +206,38 @@
 
 <script>
 const urls = {{ videourls | tojson }};
-const hlsUrl = "/stream/high?v={{ videoid }}";
+const dash = {{ dash | tojson }};
 const video = document.getElementById("videoPlayer");
-let hls = null;
 
-/* 初期再生（低画質・通常MP4） */
+let dashPlayer = null;
+
+/* 初期再生（低画質MP4） */
 video.src = urls[1] || urls[0];
 
 /* 画質変更 */
 document.getElementById("qualitySelect").addEventListener("change", e => {
     const index = e.target.value;
 
-    /* ▼ 高画質 → 高画質ストリームAPI */
-    if(index === "0"){
-        if(Hls.isSupported()){
-            if(hls){
-                hls.destroy();
-            }
-            hls = new Hls();
-            hls.loadSource(hlsUrl);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                video.play();
-            });
-        }else if(video.canPlayType("application/vnd.apple.mpegurl")){
-            video.src = hlsUrl;
-            video.play();
+    /* ▼ 高画質 → DASH */
+    if(index === "0" && dash){
+        if(dashPlayer){
+            dashPlayer.reset();
         }
+
+        dashPlayer = dashjs.MediaPlayer().create();
+
+        const highest = Object.keys(dash.videos).sort((a,b)=>b-a)[0];
+
+        dashPlayer.initialize(video, dash.videos[highest].url, true);
+        dashPlayer.attachSource(dash.videos[highest].url);
+
+        dashPlayer.setAutoPlay(true);
     }
     /* ▼ 低画質 → 通常MP4 */
     else{
-        if(hls){
-            hls.destroy();
-            hls = null;
+        if(dashPlayer){
+            dashPlayer.reset();
+            dashPlayer = null;
         }
         video.src = urls[1] || urls[0];
         video.play();
@@ -246,9 +245,9 @@ document.getElementById("qualitySelect").addEventListener("change", e => {
 });
 
 function setMode(mode){
-    if(hls){
-        hls.destroy();
-        hls = null;
+    if(dashPlayer){
+        dashPlayer.reset();
+        dashPlayer = null;
     }
 
     if(mode === "nocookie"){
@@ -261,4 +260,4 @@ function setMode(mode){
 </script>
 
 </body>
-    </html>
+</html>
