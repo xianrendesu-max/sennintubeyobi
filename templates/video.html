@@ -11,6 +11,9 @@
     <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 
+    <!-- ▼ HLS.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
     <style>
         body {
             margin: 0;
@@ -166,7 +169,6 @@
 <div class="player-wrapper">
     <video id="videoPlayer" controls
         poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg">
-        <source src="{{ videourls[0] }}">
     </video>
 </div>
 
@@ -185,10 +187,8 @@
 
 <div class="description">
 
-    <!-- ▼ 概要欄本文 -->
     {{ description | safe }}
 
-    <!-- ▼ 画質選択（概要欄の中） -->
     <div class="option-box">
         <select id="qualitySelect">
             <option value="0">高画質</option>
@@ -197,13 +197,11 @@
     </div>
 </div>
 
-<!-- ▼ 再生方式選択（概要欄の下） -->
 <div class="option-box">
     <button onclick="setMode('nocookie')">nocookie再生</button>
     <button onclick="setMode('stream')">stream再生</button>
 </div>
 
-<!-- コメント -->
 <div style="margin-top:24px">
     <iframe src="/comments?v={{ videoid }}"
         style="width:100%;border:none;min-height:600px">
@@ -231,13 +229,49 @@
 <script>
 const urls = {{ videourls | tojson }};
 const video = document.getElementById("videoPlayer");
+let hls = null;
 
+/* 初期再生（低画質・通常MP4） */
+video.src = urls[1] || urls[0];
+
+/* 画質変更 */
 document.getElementById("qualitySelect").addEventListener("change", e => {
-    video.src = urls[e.target.value];
-    video.play();
+    const index = e.target.value;
+
+    /* ▼ 高画質 → HLS */
+    if(index === "0"){
+        if(Hls.isSupported()){
+            if(hls){
+                hls.destroy();
+            }
+            hls = new Hls();
+            hls.loadSource(urls[0]);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                video.play();
+            });
+        }else if(video.canPlayType("application/vnd.apple.mpegurl")){
+            video.src = urls[0];
+            video.play();
+        }
+    }
+    /* ▼ 低画質 → 通常再生 */
+    else{
+        if(hls){
+            hls.destroy();
+            hls = null;
+        }
+        video.src = urls[1] || urls[0];
+        video.play();
+    }
 });
 
 function setMode(mode){
+    if(hls){
+        hls.destroy();
+        hls = null;
+    }
+
     if(mode === "nocookie"){
         video.src = urls[1] || urls[0];
     }else{
@@ -248,4 +282,4 @@ function setMode(mode){
 </script>
 
 </body>
-    </html>
+        </html>
