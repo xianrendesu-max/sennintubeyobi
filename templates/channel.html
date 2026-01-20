@@ -61,7 +61,6 @@ body {
     color: var(--text-sub);
 }
 
-/* 追加：登録ボタン */
 .subscribe-btn {
     margin-top: 12px;
     background: var(--yt-red);
@@ -77,20 +76,11 @@ body {
     color: #111;
 }
 
-.channel-description {
-    background: var(--card-bg);
-    padding: 20px;
-    border-radius: 14px;
-    box-shadow: var(--soft-shadow);
-    line-height: 1.7;
-}
-
 .section-title {
     font-size: 24px;
     margin: 40px 0 16px;
 }
 
-/* タブ */
 .channel-tabs {
     display: flex;
     gap: 24px;
@@ -109,7 +99,6 @@ body {
     font-weight: 600;
 }
 
-/* Shorts */
 .shorts-grid {
     display: flex;
     gap: 16px;
@@ -142,7 +131,6 @@ body {
     color: var(--text-sub);
 }
 
-/* 動画 */
 .video-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -199,9 +187,10 @@ a { text-decoration: none; color: inherit; }
     <img src="{{ channelicon }}">
     <div>
         <h1>{{ channelname }}</h1>
-        {% if subscribers_count %}
-        <p>チャンネル登録者数: {{ subscribers_count }}</p>
-        {% endif %}
+        <p>
+            {% if subscribers_count %}{{ subscribers_count }}{% endif %}
+        </p>
+        <p style="white-space:pre-wrap;">{{ channelprofile | safe }}</p>
         <button id="subscribeBtn" class="subscribe-btn">チャンネル登録</button>
     </div>
 </div>
@@ -210,13 +199,11 @@ a { text-decoration: none; color: inherit; }
     <button class="active" data-tab="home">ホーム</button>
     <button data-tab="videos">動画</button>
     <button data-tab="shorts">Shorts</button>
-    <button data-tab="about">概要</button>
 </div>
 
-<!-- ホーム -->
 <div class="tab-section active" id="tab-home">
 
-{% if shorts %}
+{% if shorts and shorts|length > 0 %}
 <h2 class="section-title">Shorts</h2>
 <div class="shorts-grid">
 {% for video in shorts %}
@@ -231,7 +218,7 @@ a { text-decoration: none; color: inherit; }
 </div>
 {% endif %}
 
-<h2 class="section-title">最新動画</h2>
+<h2 class="section-title">おすすめ動画</h2>
 <div class="video-grid">
 {% for video in results %}
 <div class="video-card">
@@ -248,7 +235,6 @@ a { text-decoration: none; color: inherit; }
 
 </div>
 
-<!-- 動画 -->
 <div class="tab-section" id="tab-videos">
 <div class="video-grid">
 {% for video in results %}
@@ -265,8 +251,8 @@ a { text-decoration: none; color: inherit; }
 </div>
 </div>
 
-<!-- Shorts -->
 <div class="tab-section" id="tab-shorts">
+{% if shorts and shorts|length > 0 %}
 <div class="shorts-grid">
 {% for video in shorts %}
 <div class="short-card">
@@ -277,19 +263,12 @@ a { text-decoration: none; color: inherit; }
 </div>
 {% endfor %}
 </div>
-</div>
-
-<!-- 概要 -->
-<div class="tab-section" id="tab-about">
-<div class="channel-description">
-    <div style="white-space:pre-wrap;">{{ channelprofile | safe }}</div>
-</div>
+{% endif %}
 </div>
 
 </div>
 
 <script>
-/* タブ */
 document.querySelectorAll(".channel-tabs button").forEach(btn => {
     btn.onclick = () => {
         document.querySelectorAll(".channel-tabs button").forEach(b => b.classList.remove("active"));
@@ -299,7 +278,6 @@ document.querySelectorAll(".channel-tabs button").forEach(btn => {
     };
 });
 
-/* 登録 */
 const btn = document.getElementById("subscribeBtn");
 const key = "subscribed_{{ channelname }}";
 
@@ -322,4 +300,4 @@ btn.onclick = () => {
 </script>
 
 </body>
-</html>
+        </html>
