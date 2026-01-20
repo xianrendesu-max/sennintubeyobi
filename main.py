@@ -17,7 +17,6 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from typing import Union
 
-
 # =========================
 # 基本設定
 # =========================
@@ -56,14 +55,12 @@ if os.path.exists("./senninverify"):
 session = requests.Session()
 session.headers.update({"User-Agent": "Mozilla/5.0"})
 
-
 # =========================
 # 例外
 # =========================
 
 class APItimeoutError(Exception):
     pass
-
 
 # =========================
 # 共通
@@ -76,10 +73,8 @@ def is_json(text: str) -> bool:
     except json.JSONDecodeError:
         return False
 
-
 def check_cookie(cookie: Union[str, None]) -> bool:
     return cookie == "True"
-
 
 # =========================
 # 並列API最速勝ち
@@ -112,18 +107,14 @@ def api_request_core(api_list, url):
 
     raise APItimeoutError("API timeout")
 
-
 def apirequest(url):
     return api_request_core(apis, url)
-
 
 def apichannelrequest(url):
     return api_request_core(apichannels, url)
 
-
 def apicommentsrequest(url):
     return api_request_core(apicomments, url)
-
 
 # =========================
 # APIラッパー
@@ -165,7 +156,6 @@ def get_search(q, page):
                 "thumbnail": thumb
             })
     return results
-
 
 # =========================
 # ★ DASH対応
@@ -228,7 +218,6 @@ def get_data(videoid):
         t
     )
 
-
 # =========================
 # ★ チャンネル
 # =========================
@@ -262,7 +251,6 @@ def get_channel(channelid):
         }
     )
 
-
 @cache(seconds=30)
 def get_home():
     data = json.loads(apirequest("api/v1/popular?hl=jp"))
@@ -286,7 +274,6 @@ def get_home():
 
     return videos, shorts, channels
 
-
 def get_comments(videoid):
     t = json.loads(apicommentsrequest("api/v1/comments/" + urllib.parse.quote(videoid) + "?hl=jp"))
     return [{
@@ -294,7 +281,6 @@ def get_comments(videoid):
         "authoricon": i["authorThumbnails"][-1]["url"],
         "body": i["contentHtml"].replace("\n", "<br>")
     } for i in t["comments"]]
-
 
 # =========================
 # FastAPI
@@ -308,13 +294,11 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 templates = Jinja2Templates(directory="templates")
 
-
 # =========================
 # 高画質ストリーム
 # =========================
 
 HLS_API_BASE_URL = "https://yudlp.vercel.app/m3u8/"
-
 
 @app.get("/stream/high")
 def stream_high(v: str):
@@ -342,7 +326,6 @@ def stream_high(v: str):
 
     raise HTTPException(status_code=503, detail="High quality stream unavailable")
 
-
 # =========================
 # ルーティング
 # =========================
@@ -366,7 +349,6 @@ def home(request: Request, response: Response, sennin: Union[str, None] = Cookie
         }
     )
 
-
 @app.get("/search", response_class=HTMLResponse)
 def search(request: Request, response: Response, q: str, page: int = 1, sennin: Union[str, None] = Cookie(None)):
     if not check_cookie(sennin):
@@ -382,7 +364,6 @@ def search(request: Request, response: Response, q: str, page: int = 1, sennin: 
         }
     )
 
-
 @app.get("/watch", response_class=HTMLResponse)
 def watch(request: Request, response: Response, v: str, sennin: Union[str, None] = Cookie(None)):
     if not check_cookie(sennin):
@@ -392,11 +373,8 @@ def watch(request: Request, response: Response, v: str, sennin: Union[str, None]
     data = get_data(v)
     t = data[10]
 
-    if (
-        t.get("isShort") is True
-        or t.get("lengthSeconds") == 0
-        or t.get("lengthText") in ("0:00", "", None)
-    ):
+    # ★ 修正点：isShort のみで判定（ここ以外一切変更なし）
+    if t.get("isShort") is True:
         return templates.TemplateResponse(
             "shorts.html",
             {
@@ -406,7 +384,7 @@ def watch(request: Request, response: Response, v: str, sennin: Union[str, None]
                 "authorid": t["authorId"],
                 "authoricon": t["authorThumbnails"][-1]["url"],
                 "title": t["title"],
-                "hls_url": f"https://yudlp.vercel.app/stream/{v}",
+                "hls_url": t.get("hlsUrl"),
             }
         )
 
@@ -427,7 +405,6 @@ def watch(request: Request, response: Response, v: str, sennin: Union[str, None]
             "dash": data[9],
         }
     )
-
 
 @app.get("/channel/{cid}", response_class=HTMLResponse)
 def channel(request: Request, response: Response, cid: str, sennin: Union[str, None] = Cookie(None)):
@@ -451,14 +428,12 @@ def channel(request: Request, response: Response, cid: str, sennin: Union[str, N
         }
     )
 
-
 @app.get("/comments", response_class=HTMLResponse)
 def comments(request: Request, v: str):
     return templates.TemplateResponse(
         "comments.html",
         {"request": request, "comments": get_comments(v)}
     )
-
 
 @app.get("/thumbnail")
 def thumbnail(v: str):
@@ -467,7 +442,6 @@ def thumbnail(v: str):
         media_type="image/jpeg"
     )
 
-
 # =========================
 # 例外
 # =========================
@@ -475,7 +449,6 @@ def thumbnail(v: str):
 @app.exception_handler(APItimeoutError)
 def api_wait(request: Request, _):
     return templates.TemplateResponse("APIwait.html", {"request": request}, status_code=500)
-
 
 @app.exception_handler(StarletteHTTPException)
 def http_exception_handler(_, exc):
