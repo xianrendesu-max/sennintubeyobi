@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>登録済みのチャンネル - 仙人tube</title>
+
+    <link rel="stylesheet" href="/css/pure-min.css">
+    <link rel="stylesheet" href="/css/grids-responsive-min.css">
+
+    <style>
+        body {
+            margin: 0;
+            background: #f9fafb;
+            font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+            color: #111827;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 100;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        main {
+            padding: 20px;
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        .empty {
+            text-align: center;
+            margin-top: 80px;
+            color: #6b7280;
+            font-size: 15px;
+        }
+
+        .channels {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 18px;
+        }
+
+        .channel-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 6px 20px rgba(0,0,0,.08);
+            text-decoration: none;
+            color: inherit;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .channel-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(0,0,0,.15);
+        }
+
+        .channel-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            flex-shrink: 0;
+            object-fit: cover;
+        }
+
+        .channel-info {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .channel-name {
+            font-size: 15px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .channel-sub {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        @media (max-width: 480px) {
+            header h1 {
+                font-size: 18px;
+            }
+
+            .channel-card {
+                padding: 14px;
+            }
+
+            .channel-icon {
+                width: 48px;
+                height: 48px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>登録済みのチャンネル</h1>
+</header>
+
+<main>
+    <div id="empty" class="empty" style="display:none;">
+        まだチャンネルを登録していません
+    </div>
+
+    <div id="channels" class="channels"></div>
+</main>
+
+<script>
+    /*
+      localStorage 保存形式（想定）
+      key: subscriptions
+      value: JSON.stringify([
+        {
+          id: "UCxxxx",
+          name: "チャンネル名",
+          icon: "https://...",
+          subscribers: "登録者数"
+        }
+      ])
+    */
+
+    const container = document.getElementById("channels");
+    const empty = document.getElementById("empty");
+
+    let subs = [];
+
+    try {
+        subs = JSON.parse(localStorage.getItem("subscriptions")) || [];
+    } catch {
+        subs = [];
+    }
+
+    if (!subs.length) {
+        empty.style.display = "block";
+    } else {
+        subs.forEach(ch => {
+            const a = document.createElement("a");
+            a.className = "channel-card";
+            a.href = "/channel/" + ch.id;
+
+            const img = document.createElement("img");
+            img.className = "channel-icon";
+            img.src = ch.icon || "";
+            img.loading = "lazy";
+
+            const info = document.createElement("div");
+            info.className = "channel-info";
+
+            const name = document.createElement("div");
+            name.className = "channel-name";
+            name.textContent = ch.name || "";
+
+            const sub = document.createElement("div");
+            sub.className = "channel-sub";
+            sub.textContent = ch.subscribers || "";
+
+            info.appendChild(name);
+            info.appendChild(sub);
+
+            a.appendChild(img);
+            a.appendChild(info);
+
+            container.appendChild(a);
+        });
+    }
+</script>
+
+</body>
+</html>
