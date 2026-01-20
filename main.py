@@ -373,7 +373,6 @@ def watch(request: Request, response: Response, v: str, sennin: Union[str, None]
     data = get_data(v)
     t = data[10]
 
-    # ★ 修正点：isShort のみで判定（ここ以外一切変更なし）
     if t.get("isShort") is True:
         return templates.TemplateResponse(
             "shorts.html",
@@ -425,6 +424,18 @@ def channel(request: Request, response: Response, cid: str, sennin: Union[str, N
             "channelprofile": info["channelprofile"],
             "subscribers_count": info["subscribers_count"],
             "cover_img_url": info["cover_img_url"],
+        }
+    )
+
+# ★ 追加：登録済みチャンネルページ
+@app.get("/subuscript", response_class=HTMLResponse)
+def subuscript(request: Request, sennin: Union[str, None] = Cookie(None)):
+    if not check_cookie(sennin):
+        return RedirectResponse("/")
+    return templates.TemplateResponse(
+        "subuscript.html",
+        {
+            "request": request,
         }
     )
 
