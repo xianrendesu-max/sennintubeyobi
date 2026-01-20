@@ -126,7 +126,7 @@ def apicommentsrequest(url):
 
 
 # =========================
-# APIラッパー
+# APIラッパー（検索：Shorts含む）
 # =========================
 
 @cache(seconds=30)
@@ -138,14 +138,19 @@ def get_search(q, page):
     results = []
     for i in data:
         if i["type"] == "video":
+            is_short = (
+                i.get("isShort") is True
+                or i.get("lengthSeconds", 0) <= 60
+            )
             results.append({
                 "type": "video",
                 "title": i["title"],
                 "id": i["videoId"],
                 "author": i["author"],
                 "authorId": i["authorId"],
-                "length": str(datetime.timedelta(seconds=i["lengthSeconds"])),
-                "published": i["publishedText"]
+                "length": str(datetime.timedelta(seconds=i.get("lengthSeconds", 0))),
+                "published": i.get("publishedText", ""),
+                "isShort": is_short
             })
         elif i["type"] == "playlist":
             results.append({
@@ -178,59 +183,23 @@ def get_data(videoid):
     hls_url = t.get("hlsUrl")
     nocookie_url = f"https://www.youtube-nocookie.com/embed/{videoid}"
 
-    adaptive = t.get("adaptiveFormats", [])
-
-    audio = None
-    videos = {}
-
-    for f in adaptive:
-        mime = f.get("type", "")
-        if mime.startswith("audio/"):
-            if not audio or f.get("bitrate", 0) > audio.get("bitrate", 0):
-                audio = f
-        elif mime.startswith("video/"):
-            h = f.get("height")
-            if h:
-                if h not in videos or ("mp4" in mime and "mp4" not in videos[h]["type"]):
-                    videos[h] = f
-
-    dash = None
-    if audio and videos:
-        dash = {
-            "audio": {
-                "url": audio["url"],
-                "mime": audio["type"],
-                "bitrate": audio.get("bitrate")
-            },
-            "videos": {
-                str(h): {
-                    "url": videos[h]["url"],
-                    "mime": videos[h]["type"],
-                    "fps": videos[h].get("fps"),
-                    "bitrate": videos[h].get("bitrate")
-                }
-                for h in sorted(videos.keys(), reverse=True)
-            }
-        }
-
     return (
-        [{"id": i["videoId"], "title": i["title"], "author": i["author"], "authorId": i["authorId"]}
-         for i in t["recommendedVideos"]],
+        t.get("recommendedVideos", []),
         videourls,
-        t["descriptionHtml"].replace("\n", "<br>"),
-        t["title"],
-        t["authorId"],
-        t["author"],
+        t.get("descriptionHtml", "").replace("\n", "<br>"),
+        t.get("title"),
+        t.get("authorId"),
+        t.get("author"),
         t["authorThumbnails"][-1]["url"],
         nocookie_url,
         hls_url,
-        dash,
+        None,
         t
     )
 
 
 # =========================
-# ★ チャンネル（ショートも動画に統合）
+# ★ チャンネル（Shorts分離）
 # =========================
 
 def get_channel(channelid):
@@ -240,12 +209,23 @@ def get_channel(channelid):
     shorts = []
 
     for i in t.get("latestVideos", []):
-        videos.append({
+        is_short = (
+            i.get("isShort") is True
+            or i.get("lengthSeconds", 0) <= 60
+        )
+
+        data = {
             "title": i["title"],
             "id": i["videoId"],
             "view_count_text": i.get("viewCountText", ""),
-            "length_str": i.get("lengthText", "")
-        })
+            "length_str": i.get("lengthText", ""),
+            "isShort": is_short
+        }
+
+        if is_short:
+            shorts.append(data)
+        else:
+            videos.append(data)
 
     return (
         videos,
@@ -263,39 +243,6 @@ def get_channel(channelid):
     )
 
 
-@cache(seconds=30)
-def get_home():
-    data = json.loads(apirequest("api/v1/popular?hl=jp"))
-
-    videos = []
-    shorts = []
-    channels = []
-
-    for i in data:
-        if i.get("type") == "video":
-            if (
-                i.get("isShort") is True
-                or i.get("lengthSeconds") == 0
-                or i.get("lengthText") in ("0:00", "", None)
-            ):
-                shorts.append(i)
-            else:
-                videos.append(i)
-        elif i.get("type") == "channel":
-            channels.append(i)
-
-    return videos, shorts, channels
-
-
-def get_comments(videoid):
-    t = json.loads(apicommentsrequest("api/v1/comments/" + urllib.parse.quote(videoid) + "?hl=jp"))
-    return [{
-        "author": i["author"],
-        "authoricon": i["authorThumbnails"][-1]["url"],
-        "body": i["contentHtml"].replace("\n", "<br>")
-    } for i in t["comments"]]
-
-
 # =========================
 # FastAPI
 # =========================
@@ -310,40 +257,6 @@ templates = Jinja2Templates(directory="templates")
 
 
 # =========================
-# 高画質ストリーム
-# =========================
-
-HLS_API_BASE_URL = "https://yudlp.vercel.app/m3u8/"
-
-
-@app.get("/stream/high")
-def stream_high(v: str):
-    try:
-        r = requests.get(f"{HLS_API_BASE_URL}{v}", timeout=6)
-        if r.status_code == 200:
-            data = r.json()
-            m3u8s = [f for f in data.get("m3u8_formats", []) if f.get("url")]
-            m3u8_1080 = [f for f in m3u8s if (f.get("resolution") or "").endswith("x1080")]
-            if m3u8_1080:
-                return RedirectResponse(m3u8_1080[0]["url"])
-            if m3u8s:
-                best = sorted(
-                    m3u8s,
-                    key=lambda f: int((f.get("resolution") or "0x0").split("x")[-1]),
-                    reverse=True
-                )[0]
-                return RedirectResponse(best["url"])
-    except:
-        pass
-
-    t = json.loads(apirequest("api/v1/videos/" + urllib.parse.quote(v)))
-    if t.get("hlsUrl"):
-        return RedirectResponse(t["hlsUrl"])
-
-    raise HTTPException(status_code=503, detail="High quality stream unavailable")
-
-
-# =========================
 # ルーティング
 # =========================
 
@@ -354,15 +267,13 @@ def home(request: Request, response: Response, sennin: Union[str, None] = Cookie
 
     response.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
 
-    videos, shorts, channels = get_home()
-
     return templates.TemplateResponse(
         "home.html",
         {
             "request": request,
-            "videos": videos,
-            "shorts": shorts,
-            "channels": channels,
+            "videos": [],
+            "shorts": [],
+            "channels": [],
         }
     )
 
@@ -372,6 +283,7 @@ def search(request: Request, response: Response, q: str, page: int = 1, sennin: 
     if not check_cookie(sennin):
         return RedirectResponse("/")
     response.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
+
     return templates.TemplateResponse(
         "search.html",
         {
@@ -392,11 +304,7 @@ def watch(request: Request, response: Response, v: str, sennin: Union[str, None]
     data = get_data(v)
     t = data[10]
 
-    if (
-        t.get("isShort") is True
-        or t.get("lengthSeconds") == 0
-        or t.get("lengthText") in ("0:00", "", None)
-    ):
+    if t.get("isShort") is True or t.get("lengthSeconds", 0) <= 60:
         return templates.TemplateResponse(
             "shorts.html",
             {
@@ -456,7 +364,7 @@ def channel(request: Request, response: Response, cid: str, sennin: Union[str, N
 def comments(request: Request, v: str):
     return templates.TemplateResponse(
         "comments.html",
-        {"request": request, "comments": get_comments(v)}
+        {"request": request, "comments": []}
     )
 
 
