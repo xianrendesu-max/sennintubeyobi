@@ -179,10 +179,10 @@ html, body {
 
 <div class="shorts-container" id="shortsContainer">
 
-{% for video in shorts %}
+<!-- ★ 単体Short対応（ここだけ変更） -->
 <div class="short-item">
     <video class="short-video"
-           src="{{ video.stream_url }}"
+           src="{{ hls_url }}"
            autoplay
            muted
            loop
@@ -191,11 +191,11 @@ html, body {
     <div class="short-actions">
         <div class="short-action like-btn">
             <span>❤️</span>
-            <div>{{ video.likeCount or '' }}</div>
+            <div></div>
         </div>
         <div class="short-action">
             <span>💬</span>
-            <div>{{ video.commentCount or '' }}</div>
+            <div></div>
         </div>
         <div class="short-action">
             <span>↗</span>
@@ -205,15 +205,14 @@ html, body {
 
     <div class="short-info">
         <div class="short-channel">
-            <div class="short-channel-name">@{{ video.channelName }}</div>
-            <button class="subscribe-btn" data-channel="{{ video.channelId }}">
+            <div class="short-channel-name">@{{ author }}</div>
+            <button class="subscribe-btn" data-channel="{{ authorid }}">
                 チャンネル登録
             </button>
         </div>
-        <div class="short-title">{{ video.title }}</div>
+        <div class="short-title">{{ title }}</div>
     </div>
 </div>
-{% endfor %}
 
 </div>
 
