@@ -225,11 +225,12 @@ def get_data(videoid):
         nocookie_url,
         hls_url,
         dash,
+        t
     )
 
 
 # =========================
-# ★ チャンネル（Shorts対応）
+# ★ チャンネル（ショートも動画に統合）
 # =========================
 
 def get_channel(channelid):
@@ -239,25 +240,12 @@ def get_channel(channelid):
     shorts = []
 
     for i in t.get("latestVideos", []):
-        is_short = (
-            i.get("isShort") is True
-            or i.get("lengthSeconds") == 0
-            or i.get("lengthText") in ("0:00", "", None)
-        )
-
-        if is_short:
-            shorts.append({
-                "videoId": i["videoId"],
-                "title": i["title"],
-                "viewCountText": i.get("viewCountText", "")
-            })
-        else:
-            videos.append({
-                "title": i["title"],
-                "id": i["videoId"],
-                "view_count_text": i.get("viewCountText", ""),
-                "length_str": i.get("lengthText", "")
-            })
+        videos.append({
+            "title": i["title"],
+            "id": i["videoId"],
+            "view_count_text": i.get("viewCountText", ""),
+            "length_str": i.get("lengthText", "")
+        })
 
     return (
         videos,
@@ -400,22 +388,43 @@ def watch(request: Request, response: Response, v: str, sennin: Union[str, None]
     if not check_cookie(sennin):
         return RedirectResponse("/")
     response.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
-    t = get_data(v)
+
+    data = get_data(v)
+    t = data[10]
+
+    if (
+        t.get("isShort") is True
+        or t.get("lengthSeconds") == 0
+        or t.get("lengthText") in ("0:00", "", None)
+    ):
+        return templates.TemplateResponse(
+            "shorts.html",
+            {
+                "request": request,
+                "videoid": v,
+                "author": t["author"],
+                "authorid": t["authorId"],
+                "authoricon": t["authorThumbnails"][-1]["url"],
+                "title": t["title"],
+                "hls_url": t.get("hlsUrl"),
+            }
+        )
+
     return templates.TemplateResponse(
         "video.html",
         {
             "request": request,
             "videoid": v,
-            "videourls": t[1],
-            "res": t[0],
-            "description": t[2],
-            "videotitle": t[3],
-            "authorid": t[4],
-            "author": t[5],
-            "authoricon": t[6],
-            "nocookie_url": t[7],
-            "hls_url": t[8],
-            "dash": t[9],
+            "videourls": data[1],
+            "res": data[0],
+            "description": data[2],
+            "videotitle": data[3],
+            "authorid": data[4],
+            "author": data[5],
+            "authoricon": data[6],
+            "nocookie_url": data[7],
+            "hls_url": data[8],
+            "dash": data[9],
         }
     )
 
