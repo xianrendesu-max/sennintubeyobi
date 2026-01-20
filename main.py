@@ -213,21 +213,6 @@ def get_data(videoid):
             }
         }
 
-    # ★ ショート用ストリームAPIを yt-dl-kappa.vercel.app に変更
-    short_stream = None
-    try:
-        r = requests.get(f"https://yt-dl-kappa.vercel.app/short/{videoid}", timeout=5)
-        if r.status_code == 200:
-            data_short = r.json()
-            short_stream = data_short.get("hls_url") or data_short.get("url")
-    except:
-        pass
-
-    if not short_stream:
-        short_stream = hls_url or (videourls[0] if videourls else None)
-    if not short_stream:
-        short_stream = nocookie_url
-
     return (
         [{"id": i["videoId"], "title": i["title"], "author": i["author"], "authorId": i["authorId"]}
          for i in t["recommendedVideos"]],
@@ -240,8 +225,7 @@ def get_data(videoid):
         nocookie_url,
         hls_url,
         dash,
-        t,
-        short_stream
+        t
     )
 
 
@@ -413,8 +397,6 @@ def watch(request: Request, response: Response, v: str, sennin: Union[str, None]
         or t.get("lengthSeconds") == 0
         or t.get("lengthText") in ("0:00", "", None)
     ):
-        # ★ ここでストリームがある場合は優先、それ以外は nocookie 埋め込み
-        short_stream = data[11]  # get_data() で追加した短編ストリーム
         return templates.TemplateResponse(
             "shorts.html",
             {
@@ -424,7 +406,7 @@ def watch(request: Request, response: Response, v: str, sennin: Union[str, None]
                 "authorid": t["authorId"],
                 "authoricon": t["authorThumbnails"][-1]["url"],
                 "title": t["title"],
-                "hls_url": short_stream,
+                "hls_url": t.get("hlsUrl"),
             }
         )
 
