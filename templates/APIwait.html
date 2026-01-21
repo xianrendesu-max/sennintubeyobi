@@ -1,10 +1,123 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>ああああああ</title>
+    <meta charset="UTF-8">
+    <title>現在読み込み中</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            background: linear-gradient(135deg, #dff1ff, #ffffff);
+            color: #333;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: #ffffff;
+            padding: 44px 36px;
+            border-radius: 18px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            max-width: 360px;
+            width: 90%;
+        }
+
+        .loader {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .loader span {
+            width: 14px;
+            height: 14px;
+            background: #4da3ff;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loader span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .loader span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.3;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            font-size: 15px;
+            line-height: 1.7;
+            color: #555;
+        }
+
+        .progress-bar {
+            margin-top: 24px;
+            width: 100%;
+            height: 6px;
+            background: #e6f2ff;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4da3ff, #7cc6ff);
+            animation: loading 1s linear infinite;
+        }
+
+        @keyframes loading {
+            0% {
+                width: 0%;
+            }
+            100% {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-    処理中です<br>しばらくお待ちください。
+    <div class="container">
+        <div class="loader">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        <div class="title">現在読み込み中</div>
+        <div class="message">
+            処理中です<br>
+            しばらくお待ちください。
+        </div>
+        <div class="progress-bar">
+            <div class="progress"></div>
+        </div>
+    </div>
     <script>setTimeout(function(){location.reload();},1000);</script>
 </body>
-</html>
+    </html>
