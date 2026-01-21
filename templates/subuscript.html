@@ -24,6 +24,16 @@
             position: sticky;
             top: 0;
             z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
         }
 
         header h1 {
@@ -63,9 +73,23 @@
             flex-shrink: 0;
         }
 
+        .channel-info {
+            flex: 1;
+        }
+
         .channel-name {
             font-size: 16px;
             font-weight: 700;
+        }
+
+        .unsubscribe {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            cursor: pointer;
         }
 
         .empty {
@@ -80,6 +104,7 @@
 <body>
 
 <header>
+    <button class="back-btn" onclick="location.href='/'">←</button>
     <h1>登録済みのチャンネル</h1>
 </header>
 
@@ -88,31 +113,63 @@
 <script>
     const container = document.getElementById("subs");
 
-    const subs = JSON.parse(
-        localStorage.getItem("subscribed_channels") || "[]"
-    );
+    const channels = [];
 
-    if (subs.length === 0) {
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith("subscribed_")) {
+            const name = key.replace("subscribed_", "");
+            channels.push({ name, key });
+        }
+    }
+
+    if (channels.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty";
         empty.textContent = "登録済みのチャンネルはありません";
         container.appendChild(empty);
     } else {
-        subs.forEach(c => {
-            const a = document.createElement("a");
-            a.href = "/channel/" + c.id;
-            a.className = "channel-card";
+        channels.forEach(c => {
+            const card = document.createElement("div");
+            card.className = "channel-card";
+
+            const link = document.createElement("a");
+            link.href = "/search?q=" + encodeURIComponent(c.name);
+            link.style.display = "flex";
+            link.style.alignItems = "center";
+            link.style.flex = "1";
+            link.style.textDecoration = "none";
+            link.style.color = "inherit";
 
             const img = document.createElement("img");
-            img.src = c.icon;
+            img.src = "/css/default_channel.png";
+
+            const info = document.createElement("div");
+            info.className = "channel-info";
 
             const name = document.createElement("div");
             name.className = "channel-name";
             name.textContent = c.name;
 
-            a.appendChild(img);
-            a.appendChild(name);
-            container.appendChild(a);
+            info.appendChild(name);
+            link.appendChild(img);
+            link.appendChild(info);
+
+            const unsub = document.createElement("button");
+            unsub.className = "unsubscribe";
+            unsub.textContent = "登録解除";
+            unsub.onclick = (e) => {
+                e.stopPropagation();
+                localStorage.removeItem(c.key);
+                card.remove();
+                if (container.children.length === 0) {
+                    location.reload();
+                }
+            };
+
+            card.appendChild(link);
+            card.appendChild(unsub);
+            container.appendChild(card);
         });
     }
 </script>
