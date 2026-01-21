@@ -39,10 +39,17 @@
         .main-grid { grid-template-columns: 1fr; }
     }
 
-    .player-wrapper video {
+    .player-wrapper video,
+    .player-wrapper iframe {
         width: 100%;
+        aspect-ratio: 16 / 9;
         background: black;
         border-radius: 14px;
+    }
+
+    .player-wrapper iframe {
+        border: none;
+        display: none;
     }
 
     .video-title {
@@ -146,6 +153,12 @@
     <video id="videoPlayer" controls
         poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg">
     </video>
+
+    <iframe
+        id="nocookieFrame"
+        allow="autoplay; encrypted-media"
+        allowfullscreen>
+    </iframe>
 </div>
 
 <div class="video-title">{{ videotitle }}</div>
@@ -206,6 +219,8 @@
 const urls = {{ videourls | tojson }};
 const dash = {{ dash | tojson }};
 const video = document.getElementById("videoPlayer");
+const iframe = document.getElementById("nocookieFrame");
+const qualitySelect = document.getElementById("qualitySelect");
 
 let dashPlayer = null;
 
@@ -213,7 +228,7 @@ let dashPlayer = null;
 video.src = urls[1] || urls[0];
 
 /* 画質変更 */
-document.getElementById("qualitySelect").addEventListener("change", e => {
+qualitySelect.addEventListener("change", e => {
     const index = e.target.value;
 
     if(index === "0" && dash){
@@ -237,7 +252,7 @@ document.getElementById("qualitySelect").addEventListener("change", e => {
     }
 });
 
-/* ▼ nocookie公式対応（ここだけ変更） */
+/* ▼ nocookie埋め込み再生（画質選択尊重） */
 function setMode(mode){
     if(dashPlayer){
         dashPlayer.reset();
@@ -245,15 +260,31 @@ function setMode(mode){
     }
 
     if(mode === "nocookie"){
-        window.open(
-            "https://www.youtube-nocookie.com/embed/{{ videoid }}?autoplay=1",
-            "_blank"
-        );
-        return;
-    }else{
-        video.src = urls[0];
+        video.pause();
+        video.style.display = "none";
+
+        iframe.src =
+            "https://www.youtube-nocookie.com/embed/{{ videoid }}?autoplay=1";
+        iframe.style.display = "block";
     }
-    video.play();
+    else{
+        iframe.src = "";
+        iframe.style.display = "none";
+
+        video.style.display = "block";
+
+        if(qualitySelect.value === "0" && dash){
+            dashPlayer = dashjs.MediaPlayer().create();
+            const highest = Object.keys(dash.videos).sort((a,b)=>b-a)[0];
+            dashPlayer.initialize(video, dash.videos[highest].url, true);
+            dashPlayer.attachSource(dash.videos[highest].url);
+            dashPlayer.setAutoPlay(true);
+        }
+        else{
+            video.src = urls[1] || urls[0];
+            video.play();
+        }
+    }
 }
 </script>
 
