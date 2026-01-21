@@ -6,7 +6,6 @@
     <link rel="stylesheet" href="/css/grids-responsive-min.css">
     <link rel="stylesheet" href="/css/default.css">
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-
     <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 
@@ -140,8 +139,8 @@
 
 <div class="container">
 <div class="main-grid">
-<div>
 
+<div>
 <div class="player-wrapper">
     <video id="videoPlayer" controls
         poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg">
@@ -172,9 +171,15 @@
 </div>
 </div>
 
+<!-- ▼ ここに追加（nocookieの隣） -->
 <div class="option-box">
     <button onclick="setMode('nocookie')">nocookie再生</button>
     <button onclick="setMode('stream')">stream再生</button>
+
+    <select id="backendSelect">
+        <option value="main">main</option>
+        <option value="yobi">yobi</option>
+    </select>
 </div>
 
 <div style="margin-top:24px">
@@ -182,7 +187,6 @@
         style="width:100%;border:none;min-height:600px">
     </iframe>
 </div>
-
 </div>
 
 <div class="related">
@@ -206,36 +210,43 @@
 const urls = {{ videourls | tojson }};
 const dash = {{ dash | tojson }};
 const video = document.getElementById("videoPlayer");
+const backendSelect = document.getElementById("backendSelect");
 
 let dashPlayer = null;
 
 /* iOS判定 */
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
+/* backend取得 */
+function getStreamBase(){
+    return backendSelect.value === "yobi"
+        ? "/api/streamurl/yobi"
+        : "/api/streamurl";
+}
+
 /* 初期再生（低画質MP4） */
 video.src = urls[1] || urls[0];
 
-/* 画質変更（★ iOSは m3u8 優先） */
+/* 画質変更 */
 document.getElementById("qualitySelect").addEventListener("change", e => {
     const index = e.target.value;
 
     /* ===== 高画質 ===== */
     if (index === "0") {
 
-        /* iOSは HLS(m3u8) 最優先 */
+        /* iOS → 必ず m3u8 */
         if (isIOS) {
             if (dashPlayer) {
                 dashPlayer.reset();
                 dashPlayer = null;
             }
-            video.src = "/stream/high?v={{ videoid }}";
+            video.src = getStreamBase() + "?video_id={{ videoid }}";
             video.play();
             return;
         }
 
-        /* 非iOS：① DASH 最優先 */
+        /* 非iOS → DASH */
         if (dash && dash.videos && dash.audio) {
-
             if (dashPlayer) {
                 dashPlayer.reset();
             }
@@ -252,13 +263,13 @@ document.getElementById("qualitySelect").addEventListener("change", e => {
             return;
         }
 
-        /* 非iOS：② m3u8 */
-        video.src = "/stream/high?v={{ videoid }}";
+        /* 非iOS → m3u8 */
+        video.src = getStreamBase() + "?video_id={{ videoid }}";
         video.play();
         return;
     }
 
-    /* ===== 低画質（MP4） ===== */
+    /* ===== 低画質 ===== */
     if (dashPlayer) {
         dashPlayer.reset();
         dashPlayer = null;
