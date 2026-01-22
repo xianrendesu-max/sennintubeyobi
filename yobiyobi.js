@@ -1,12 +1,10 @@
-import express from "express";
-import ytdl from "@distube/ytdl-core";
+/* ===============================
+   yobiyobi.js ULTIMATE + API POOL
+   =============================== */
 
-/* =========================
-   追加：外部APIエンドポイント群
-   （※ 現在は未使用、将来用）
-========================= */
-
-// APIエンドポイント、全部アカウント変えて作ってる
+/* ===============================
+   APIエンドポイント（GASプール）
+   =============================== */
 const API_URLS = [
   "https://script.google.com/macros/s/AKfycbzqpav7y2x3q756wRSOhBzaXf-2hKaLTvxoFN8kFegrIvamH03ZXphEw2PK30L7AstC/exec",
   "https://script.google.com/macros/s/AKfycbyXCS6JsBglbqlW0eIOWpVscTdNA8QUISRaGMJUAiMlYfp4Ju-Avkw1ai3A6P_ek-FK/exec",
@@ -19,70 +17,220 @@ const API_URLS = [
   "https://script.google.com/macros/s/AKfycbyjbFpmnhvs0BSorjNuIoZkIOsiH7OsovlYkl3DBI9SA3_19jOBqjr999WA_12HYxhT0A/exec"
 ];
 
-// ランダムに1つ返す関数
-export function apiurl() {
+function apiurl() {
   const index = Math.floor(Math.random() * API_URLS.length);
   return API_URLS[index];
 }
 
-/* =========================
-   ここから下は既存構造維持
-========================= */
+/* ===============================
+   HTMLから渡されたデータ
+   =============================== */
+const {
+  videourls: urls,
+  videoid,
+  nocookieUrl
+} = window.__YOBI_DATA__;
 
-const router = express.Router();
+/* ===============================
+   DOM
+   =============================== */
+const video = document.getElementById("videoPlayer");
+const backendSelect = document.getElementById("backendSelect");
+const qualitySelect = document.getElementById("qualitySelect");
 
-/* iOS判定 */
-function isIOS(req) {
-  const ua = req.headers["user-agent"] || "";
-  return /iPad|iPhone|iPod/.test(ua);
+/* ===============================
+   状態
+   =============================== */
+let hlsPlayer = null;
+let fallbackTimer = null;
+let currentBackendIndex = 0;
+
+const BACKENDS = ["yobiyobi", "yobi", "main"];
+
+/* ===============================
+   Overlay UI
+   =============================== */
+const overlay = document.createElement("div");
+overlay.style.cssText = `
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.55);
+  z-index:9999;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  font-size:16px;
+`;
+overlay.innerHTML = `<div id="overlayText">再生準備中…</div>`;
+document.body.appendChild(overlay);
+
+function showOverlay(text) {
+  overlay.style.display = "flex";
+  document.getElementById("overlayText").innerText = text;
+}
+function hideOverlay() {
+  overlay.style.display = "none";
 }
 
-/* VideoID検証 */
-function validateYouTubeId(id) {
-  return /^[\w-]{11}$/.test(id);
+/* ===============================
+   backend URL
+   =============================== */
+function getStreamBase(name) {
+  if (name === "yobi") return "/api/streamurl/yobi";
+  if (name === "yobiyobi") return "/api/streamurl/yobiyobi";
+  return "/api/streamurl";
 }
 
-/**
- * yobiyobi : 最終フォールバック m3u8 専用
- * URL: /api/streamurl/yobiyobi?video_id=xxxx
- */
-router.get("/", async (req, res) => {
-  const videoId = req.query.video_id;
+/* ===============================
+   初期再生（main）
+   =============================== */
+video.src = urls[1] || urls[0];
 
-  if (!validateYouTubeId(videoId)) {
-    return res.status(400).send("invalid video id");
-  }
-
-  try {
-    const info = await ytdl.getInfo(videoId);
-    const formats = info.formats;
-
-    /* =========================
-       ★ 最重要：本物の m3u8 判定
-       isHLS は使わない
-    ========================= */
-    const hlsBest = formats
-      .filter(f =>
-        typeof f.url === "string" &&
-        f.url.includes("/manifest/hls_playlist/")
-      )
-      .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-
-    if (hlsBest) {
-      res.redirect(hlsBest.url);
-      return;
+/* ===============================
+   GAS から m3u8 URL 取得
+   =============================== */
+async function fetchHlsFromApiPool() {
+  for (let i = 0; i < API_URLS.length; i++) {
+    try {
+      const url = `${apiurl()}?video_id=${videoid}`;
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) continue;
+      const json = await r.json();
+      if (json && json.m3u8) {
+        return json.m3u8;
+      }
+    } catch (e) {
+      console.warn("GAS API失敗");
     }
-
-    /* =========================
-       yobiyobiでは JSON/DASH を返さない
-       → 失敗は失敗として返す
-    ========================= */
-    throw new Error("m3u8 not available");
-
-  } catch (err) {
-    console.error("yobiyobi error:", err);
-    res.status(500).send("stream error");
   }
-});
+  throw new Error("全GAS API失敗");
+}
 
-export default router;
+/* ===============================
+   HLS 再生
+   =============================== */
+async function playHLSWithApiPool() {
+  showOverlay("高画質ストリーム取得中…");
+
+  let hlsUrl;
+  try {
+    hlsUrl = await fetchHlsFromApiPool();
+  } catch {
+    fallback();
+    return;
+  }
+
+  playHLS(hlsUrl);
+}
+
+function playHLS(url) {
+  if (hlsPlayer) {
+    hlsPlayer.destroy();
+    hlsPlayer = null;
+  }
+
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = url;
+    video.play().then(hideOverlay);
+    return;
+  }
+
+  if (!window.Hls || !Hls.isSupported()) {
+    fallback();
+    return;
+  }
+
+  hlsPlayer = new Hls({
+    enableWorker: true,
+    lowLatencyMode: true
+  });
+
+  hlsPlayer.loadSource(url);
+  hlsPlayer.attachMedia(video);
+
+  hlsPlayer.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+    syncQualitySelector(data.levels);
+    video.play();
+    hideOverlay();
+  });
+
+  hlsPlayer.on(Hls.Events.ERROR, (_, data) => {
+    if (data.fatal) {
+      fallback();
+    }
+  });
+
+  fallbackTimer = setTimeout(() => {
+    fallback();
+  }, 8000);
+}
+
+/* ===============================
+   m3u8 画質同期
+   =============================== */
+function syncQualitySelector(levels) {
+  qualitySelect.innerHTML = "";
+
+  levels
+    .map((l, i) => ({ height: l.height, index: i }))
+    .sort((a, b) => b.height - a.height)
+    .forEach((l) => {
+      const opt = document.createElement("option");
+      opt.value = l.index;
+      opt.textContent = `${l.height}p`;
+      qualitySelect.appendChild(opt);
+    });
+
+  qualitySelect.onchange = () => {
+    if (hlsPlayer) {
+      hlsPlayer.currentLevel = Number(qualitySelect.value);
+    }
+  };
+}
+
+/* ===============================
+   フォールバック処理
+   =============================== */
+function fallback() {
+  clearTimeout(fallbackTimer);
+
+  if (hlsPlayer) {
+    hlsPlayer.destroy();
+    hlsPlayer = null;
+  }
+
+  currentBackendIndex++;
+
+  if (currentBackendIndex >= BACKENDS.length) {
+    showOverlay("再生失敗。通常再生に戻します");
+    video.src = urls[0];
+    video.play();
+    setTimeout(hideOverlay, 1500);
+    return;
+  }
+
+  const next = BACKENDS[currentBackendIndex];
+  showOverlay(`${next} に切替中…`);
+
+  if (next === "main") {
+    video.src = urls[0];
+    video.play();
+    setTimeout(hideOverlay, 800);
+  } else {
+    playHLSWithApiPool();
+  }
+}
+
+/* ===============================
+   手動 backend 切替
+   =============================== */
+backendSelect.onchange = () => {
+  currentBackendIndex = BACKENDS.indexOf(backendSelect.value);
+  playHLSWithApiPool();
+};
+
+/* ===============================
+   再生開始（最優先 yobiyobi）
+   =============================== */
+playHLSWithApiPool();
