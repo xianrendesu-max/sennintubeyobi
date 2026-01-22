@@ -26,8 +26,7 @@ export function apiurl() {
 }
 
 /* =========================
-   ここから下は既存コード
-   （一切変更なし）
+   ここから下は既存構造維持
 ========================= */
 
 const router = express.Router();
@@ -44,7 +43,7 @@ function validateYouTubeId(id) {
 }
 
 /**
- * yobiyobi : 最終フォールバック高画質ストリーム
+ * yobiyobi : 最終フォールバック m3u8 専用
  * URL: /api/streamurl/yobiyobi?video_id=xxxx
  */
 router.get("/", async (req, res) => {
@@ -59,33 +58,15 @@ router.get("/", async (req, res) => {
     const formats = info.formats;
 
     /* =========================
-       iOS / Safari → m3u8
-    ========================= */
-    if (isIOS(req)) {
-      const hls = formats
-        .filter(f =>
-          f.isHLS &&
-          f.mimeType?.includes("mp4") &&
-          f.qualityLabel
-        )
-        .sort((a, b) => parseInt(b.qualityLabel) - parseInt(a.qualityLabel))[0];
-
-      if (!hls) throw new Error("HLS not found");
-
-      res.redirect(hls.url);
-      return;
-    }
-
-    /* =========================
-       非iOS → 最高画質 m3u8 優先
+       ★ 最重要：本物の m3u8 判定
+       isHLS は使わない
     ========================= */
     const hlsBest = formats
       .filter(f =>
-        f.isHLS &&
-        f.mimeType?.includes("mp4") &&
-        f.qualityLabel
+        typeof f.url === "string" &&
+        f.url.includes("/manifest/hls_playlist/")
       )
-      .sort((a, b) => parseInt(b.qualityLabel) - parseInt(a.qualityLabel))[0];
+      .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
 
     if (hlsBest) {
       res.redirect(hlsBest.url);
@@ -93,41 +74,10 @@ router.get("/", async (req, res) => {
     }
 
     /* =========================
-       m3u8が無い → DASH fallback
+       yobiyobiでは JSON/DASH を返さない
+       → 失敗は失敗として返す
     ========================= */
-
-    const videoOnly = formats
-      .filter(f =>
-        f.hasVideo &&
-        !f.hasAudio &&
-        f.container === "mp4" &&
-        f.qualityLabel
-      )
-      .sort((a, b) => parseInt(b.qualityLabel) - parseInt(a.qualityLabel))[0];
-
-    const audioOnly = ytdl.chooseFormat(formats, {
-      quality: "highestaudio",
-      filter: "audioonly"
-    });
-
-    if (!videoOnly || !audioOnly) {
-      throw new Error("DASH formats not found");
-    }
-
-    res.json({
-      dash: {
-        videos: {
-          [videoOnly.qualityLabel.replace("p", "")]: {
-            url: videoOnly.url,
-            codecs: videoOnly.codecs
-          }
-        },
-        audio: {
-          url: audioOnly.url,
-          codecs: audioOnly.codecs
-        }
-      }
-    });
+    throw new Error("m3u8 not available");
 
   } catch (err) {
     console.error("yobiyobi error:", err);
