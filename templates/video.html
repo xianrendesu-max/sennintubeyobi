@@ -9,10 +9,7 @@
     <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 
-    <!-- ▼ dash.js（高画質用） -->
     <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
-
-    <!-- ▼ hls.js（yobi / yobiyobi 用） -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <style>
@@ -134,6 +131,30 @@
         height: 100%;
         object-fit: cover;
     }
+
+    /* ▼ 追加：動画エラーアラート */
+    .video-error-alert {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-20px);
+        background: #ef4444;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        opacity: 0;
+        pointer-events: none;
+        animation: slideFade 0.4s ease forwards;
+        z-index: 10;
+    }
+
+    @keyframes slideFade {
+        to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    }
 </style>
 </head>
 
@@ -144,7 +165,11 @@
 <div class="main-grid">
 
 <div>
-<div class="player-wrapper">
+<div class="player-wrapper" style="position:relative">
+    <div id="videoError" class="video-error-alert">
+        ⚠ 動画の取得に失敗しました。別の再生方法をお試しください。
+    </div>
+
     <video id="videoPlayer" controls
         poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg">
     </video>
@@ -215,30 +240,34 @@ const dash = {{ dash | tojson }};
 const video = document.getElementById("videoPlayer");
 const backendSelect = document.getElementById("backendSelect");
 const qualitySelect = document.getElementById("qualitySelect");
+const errorAlert = document.getElementById("videoError");
 
 let dashPlayer = null;
 let hlsPlayer = null;
 
-/* iOS判定 */
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+function showVideoError(){
+    errorAlert.style.display = "block";
+    errorAlert.style.animation = "none";
+    errorAlert.offsetHeight;
+    errorAlert.style.animation = null;
+}
 
-/* backend取得 */
+video.onerror = showVideoError;
+
 function getStreamBase(){
     if (backendSelect.value === "yobi") return "/api/streamurl/yobi";
     if (backendSelect.value === "yobiyobi") return "/api/streamurl/yobiyobi";
     return "/api/streamurl";
 }
 
-/* 初期再生 */
 video.src = urls[1] || urls[0];
 
-/* HLS再生（yobi / yobiyobi 対応） */
 function playHLSWithBackend(backend){
     const url = getStreamBase() + "?video_id={{ videoid }}";
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = url;
-        video.play();
+        video.play().catch(showVideoError);
         return;
     }
 
@@ -248,19 +277,17 @@ function playHLSWithBackend(backend){
     }
 
     if (Hls.isSupported()) {
-        hlsPlayer = new Hls({
-            maxRetries: 3,
-            retryDelay: 1000
-        });
+        hlsPlayer = new Hls();
 
         hlsPlayer.loadSource(url);
         hlsPlayer.attachMedia(video);
 
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-            video.play();
+            video.play().catch(showVideoError);
         });
 
         hlsPlayer.on(Hls.Events.ERROR, function (event, data) {
+            showVideoError();
             if (data.fatal && backend === "yobi") {
                 backendSelect.value = "yobiyobi";
                 playHLSWithBackend("yobiyobi");
@@ -268,11 +295,10 @@ function playHLSWithBackend(backend){
         });
     } else {
         video.src = url;
-        video.play();
+        video.play().catch(showVideoError);
     }
 }
 
-/* nocookie / stream */
 function setMode(mode){
     if(dashPlayer){
         dashPlayer.reset();
@@ -292,11 +318,10 @@ function setMode(mode){
         return;
     }else{
         video.src = urls[0];
-        video.play();
+        video.play().catch(showVideoError);
     }
 }
 
-/* backend変更時 */
 backendSelect.addEventListener("change", () => {
     const backend = backendSelect.value;
 
@@ -306,11 +331,10 @@ backendSelect.addEventListener("change", () => {
         video.src = qualitySelect.value === "1"
             ? urls[0]
             : (urls[1] || urls[0]);
-        video.play();
+        video.play().catch(showVideoError);
     }
 });
 
-/* 画質変更時 */
 qualitySelect.addEventListener("change", () => {
     const backend = backendSelect.value;
 
@@ -320,7 +344,7 @@ qualitySelect.addEventListener("change", () => {
         video.src = qualitySelect.value === "1"
             ? urls[0]
             : (urls[1] || urls[0]);
-        video.play();
+        video.play().catch(showVideoError);
     }
 });
 </script>
