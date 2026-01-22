@@ -5,5 +5,5 @@ pip install -r requirements.txt
 ```
 startCommand<br>
 ```JavaScript
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
+uvicorn --port $PORT --host 0.0.0.0 main:app
 ```
