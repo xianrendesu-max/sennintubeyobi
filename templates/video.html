@@ -217,6 +217,7 @@ const backendSelect = document.getElementById("backendSelect");
 const qualitySelect = document.getElementById("qualitySelect");
 
 let dashPlayer = null;
+let hlsPlayer = null;
 
 /* iOS判定 */
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -231,9 +232,10 @@ function getStreamBase(){
 /* 初期再生 */
 video.src = urls[1] || urls[0];
 
-/* yobi / yobiyobi 再生 */
-let hlsPlayer = null;
-function playYobiHLS(url){
+/* HLS再生（yobi / yobiyobi 対応） */
+function playHLSWithBackend(backend){
+    const url = getStreamBase() + "?video_id={{ videoid }}";
+
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = url;
         video.play();
@@ -246,11 +248,23 @@ function playYobiHLS(url){
     }
 
     if (Hls.isSupported()) {
-        hlsPlayer = new Hls();
+        hlsPlayer = new Hls({
+            maxRetries: 3,
+            retryDelay: 1000
+        });
+
         hlsPlayer.loadSource(url);
         hlsPlayer.attachMedia(video);
+
         hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
             video.play();
+        });
+
+        hlsPlayer.on(Hls.Events.ERROR, function (event, data) {
+            if (data.fatal && backend === "yobi") {
+                backendSelect.value = "yobiyobi";
+                playHLSWithBackend("yobiyobi");
+            }
         });
     } else {
         video.src = url;
@@ -282,23 +296,30 @@ function setMode(mode){
     }
 }
 
-/* ===== 追加：取得方法変更を即反映 ===== */
+/* backend変更時 */
 backendSelect.addEventListener("change", () => {
-    if (qualitySelect.value === "0" &&
-        (backendSelect.value === "yobi" || backendSelect.value === "yobiyobi")) {
-        playYobiHLS(getStreamBase() + "?video_id={{ videoid }}");
+    const backend = backendSelect.value;
+
+    if (qualitySelect.value === "0" && (backend === "yobi" || backend === "yobiyobi")) {
+        playHLSWithBackend(backend);
     } else {
-        video.src = qualitySelect.value === "1" ? urls[0] : (urls[1] || urls[0]);
+        video.src = qualitySelect.value === "1"
+            ? urls[0]
+            : (urls[1] || urls[0]);
         video.play();
     }
 });
 
+/* 画質変更時 */
 qualitySelect.addEventListener("change", () => {
-    if (qualitySelect.value === "0" &&
-        (backendSelect.value === "yobi" || backendSelect.value === "yobiyobi")) {
-        playYobiHLS(getStreamBase() + "?video_id={{ videoid }}");
+    const backend = backendSelect.value;
+
+    if (qualitySelect.value === "0" && (backend === "yobi" || backend === "yobiyobi")) {
+        playHLSWithBackend(backend);
     } else {
-        video.src = qualitySelect.value === "1" ? urls[0] : (urls[1] || urls[0]);
+        video.src = qualitySelect.value === "1"
+            ? urls[0]
+            : (urls[1] || urls[0]);
         video.play();
     }
 });
