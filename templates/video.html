@@ -132,7 +132,7 @@
         object-fit: cover;
     }
 
-    /* ▼ 追加：動画エラーアラート */
+    /* ▼ 動画エラーアラート */
     .video-error-alert {
         position: absolute;
         top: 20px;
@@ -140,13 +140,27 @@
         transform: translateX(-50%) translateY(-20px);
         background: #ef4444;
         color: white;
-        padding: 12px 20px;
+        padding: 12px 40px 12px 20px;
         border-radius: 12px;
         font-size: 14px;
         opacity: 0;
-        pointer-events: none;
+        pointer-events: auto;
         animation: slideFade 0.4s ease forwards;
         z-index: 10;
+    }
+
+    .video-error-alert .close-btn {
+        position: absolute;
+        top: 6px;
+        right: 10px;
+        font-size: 18px;
+        cursor: pointer;
+        line-height: 1;
+        opacity: 0.8;
+    }
+
+    .video-error-alert .close-btn:hover {
+        opacity: 1;
     }
 
     @keyframes slideFade {
@@ -166,8 +180,9 @@
 
 <div>
 <div class="player-wrapper" style="position:relative">
-    <div id="videoError" class="video-error-alert">
+    <div id="videoError" class="video-error-alert" style="display:none">
         ⚠ 動画の取得に失敗しました。別の再生方法をお試しください。
+        <span class="close-btn" onclick="hideVideoError()">×</span>
     </div>
 
     <video id="videoPlayer" controls
@@ -252,6 +267,10 @@ function showVideoError(){
     errorAlert.style.animation = null;
 }
 
+function hideVideoError(){
+    errorAlert.style.display = "none";
+}
+
 video.onerror = showVideoError;
 
 function getStreamBase(){
@@ -286,9 +305,9 @@ function playHLSWithBackend(backend){
             video.play().catch(showVideoError);
         });
 
-        hlsPlayer.on(Hls.Events.ERROR, function (event, data) {
+        hlsPlayer.on(Hls.Events.ERROR, function () {
             showVideoError();
-            if (data.fatal && backend === "yobi") {
+            if (backend === "yobi") {
                 backendSelect.value = "yobiyobi";
                 playHLSWithBackend("yobiyobi");
             }
