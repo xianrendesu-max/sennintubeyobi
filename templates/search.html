@@ -1,19 +1,13 @@
 {% extends "base.html" %}
 
 {% block title %}
-{% if word %}
-検索結果: {{ word }} - 仙人tube
-{% else %}
 プレイリスト - 仙人tube
-{% endif %}
 {% endblock %}
 
 {% block content %}
 
 <style>
-/* ===============================
-   全体トーン（明るく）
-================================ */
+/* ===== 検索結果ページと同一UI ===== */
 :root {
     --bg-main: #f9fafb;
     --card-bg: #ffffff;
@@ -25,26 +19,12 @@ body {
     background: var(--bg-main);
 }
 
-/* ===============================
-   見出し
-================================ */
-.search-results-container h2 {
-    color: #111827;
-    letter-spacing: 0.02em;
-}
-
-/* ===============================
-   結果リスト
-================================ */
 .results-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 28px;
 }
 
-/* ===============================
-   動画カード
-================================ */
 .video-card {
     background: var(--card-bg);
     border-radius: 16px;
@@ -90,133 +70,44 @@ body {
     color: #6b7280;
 }
 
-/* ===============================
-   チャンネルカード
-================================ */
-.channel-card {
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: var(--shadow-soft);
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
-}
-
-.channel-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 14px 32px rgba(0,0,0,0.12);
-}
-
-.channel-card img {
-    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-}
-
-.channel-card h3 {
-    margin: 0;
-    font-size: 16px;
-}
-
-/* ===============================
-   プレイリストカード
-================================ */
-.playlist-card img {
-    filter: brightness(0.95);
-}
-
-/* ===============================
-   ページネーション
-================================ */
-.pagination a {
-    display: inline-block;
-    padding: 12px 28px;
-    border-radius: 999px;
-    background: linear-gradient(135deg, var(--yt-red), #ff6b6b);
-    color: #ffffff !important;
-    text-decoration: none;
-    box-shadow: 0 10px 26px rgba(255,0,0,0.35);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-.pagination a:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 16px 36px rgba(255,0,0,0.45);
-}
-
-/* ===============================
-   モバイル調整
-================================ */
 @media (max-width: 640px) {
     .results-list {
         grid-template-columns: 1fr;
     }
-
-    .search-results-container {
-        padding: 0 12px !important;
-    }
 }
 </style>
 
-<div class="search-results-container" style="max-width: 1200px; margin: 24px auto; padding: 0 24px;">
+<div class="search-results-container"
+     style="max-width:1200px;margin:24px auto;padding:0 24px;">
 
-    {% if word %}
-        <h2 style="font-size: 20px;">
-            検索結果:
-            <span style="font-weight: normal;">{{ word }}</span>
+    <!-- ===== プレイリスト情報 ===== -->
+    <div style="margin-bottom:24px;">
+        <h2 style="font-size:20px;margin-bottom:4px;">
+            プレイリスト
         </h2>
-    {% else %}
-        <h2 style="font-size: 20px;">プレイリストの動画</h2>
-    {% endif %}
-
-    <div class="results-list" style="margin-top: 32px;">
-        {% for item in results %}
-
-            {% if item.type == 'video' %}
-            <div class="video-card">
-                <a href="/watch?v={{ item.id }}">
-                    <img src="/thumbnail?v={{ item.id }}" alt="{{ item.title }}">
-                </a>
-                <div class="video-meta">
-                    <h3>
-                        <a href="/watch?v={{ item.id }}">{{ item.title }}</a>
-                    </h3>
-                    <p>{{ item.author }} ・ {{ item.view_count_text }}</p>
-                    <p>{{ item.published }} ・ {{ item.length }}</p>
-                </div>
-            </div>
-
-            {% elif item.type == 'channel' %}
-            <div class="channel-card" style="display:flex;align-items:center;">
-                <a href="/channel/{{ item.id }}">
-                    <img src="{{ item.thumbnail }}" style="width:80px;height:80px;border-radius:50%;margin-right:16px;">
-                </a>
-                <div>
-                    <h3>
-                        <a href="/channel/{{ item.id }}" style="color:#111827;">
-                            {{ item.author }}
-                        </a>
-                    </h3>
-                    <p style="color:#6b7280;">チャンネル</p>
-                </div>
-            </div>
-
-            {% elif item.type == 'playlist' %}
-            <div class="playlist-card video-card">
-                <a href="/playlist?list={{ item.id }}">
-                    <img src="{{ item.thumbnail }}" alt="{{ item.title }}">
-                </a>
-                <div class="video-meta">
-                    <h3>
-                        <a href="/playlist?list={{ item.id }}">{{ item.title }}</a>
-                    </h3>
-                    <p style="color:#6b7280;">動画数: {{ item.count }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-        {% endfor %}
+        <p style="color:#6b7280;font-size:14px;">
+            全 {{ videos|length }} 件の動画
+        </p>
     </div>
 
-    <div class="pagination" style="text-align:center;margin:40px 0;">
-        <a href="{{ next }}">次のページへ »</a>
+    <!-- ===== 動画一覧（省略なし） ===== -->
+    <div class="results-list">
+        {% for v in videos %}
+        <div class="video-card">
+            <a href="/watch?v={{ v.videoId }}&list={{ list_id }}&index={{ loop.index0 }}">
+                <img src="/thumbnail?v={{ v.videoId }}" alt="{{ v.title }}">
+            </a>
+            <div class="video-meta">
+                <h3>
+                    <a href="/watch?v={{ v.videoId }}&list={{ list_id }}&index={{ loop.index0 }}">
+                        {{ v.title }}
+                    </a>
+                </h3>
+                <p>{{ v.author }}</p>
+                <p>{{ v.lengthSeconds }} 秒</p>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 
 </div>
