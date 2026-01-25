@@ -132,7 +132,6 @@
         object-fit: cover;
     }
 
-    /* ▼ 動画エラーアラート */
     .video-error-alert {
         position: absolute;
         top: 20px;
@@ -251,13 +250,11 @@
 
 <script>
 const urls = {{ videourls | tojson }};
-const dash = {{ dash | tojson }};
 const video = document.getElementById("videoPlayer");
 const backendSelect = document.getElementById("backendSelect");
 const qualitySelect = document.getElementById("qualitySelect");
 const errorAlert = document.getElementById("videoError");
 
-let dashPlayer = null;
 let hlsPlayer = null;
 
 function showVideoError(){
@@ -281,8 +278,8 @@ function getStreamBase(){
 
 video.src = urls[1] || urls[0];
 
-function playHLSWithBackend(backend){
-    const url = getStreamBase() + "?video_id={{ videoid }}";
+function playHLSWithBackend(){
+    const url = "/api/streamurl/yobi?video_id={{ videoid }}";
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = url;
@@ -297,7 +294,6 @@ function playHLSWithBackend(backend){
 
     if (Hls.isSupported()) {
         hlsPlayer = new Hls();
-
         hlsPlayer.loadSource(url);
         hlsPlayer.attachMedia(video);
 
@@ -305,68 +301,55 @@ function playHLSWithBackend(backend){
             video.play().catch(showVideoError);
         });
 
-        hlsPlayer.on(Hls.Events.ERROR, function () {
+        hlsPlayer.on(Hls.Events.ERROR, () => {
             showVideoError();
-            if (backend === "yobi") {
-                backendSelect.value = "yobiyobi";
-                playHLSWithBackend("yobiyobi");
-            }
+            backendSelect.value = "yobiyobi";
+            video.src = "/api/streamurl/yobiyobi?video_id={{ videoid }}";
+            video.play().catch(showVideoError);
         });
-    } else {
-        video.src = url;
-        video.play().catch(showVideoError);
-    }
-}
-
-function setMode(mode){
-    if(dashPlayer){
-        dashPlayer.reset();
-        dashPlayer = null;
-    }
-
-    if(mode === "nocookie"){
-        const iframe = document.createElement("iframe");
-        iframe.src = "{{ nocookie_url }}?autoplay=1";
-        iframe.style.width = "100%";
-        iframe.style.height = "480px";
-        iframe.style.border = "none";
-
-        const wrapper = document.querySelector(".player-wrapper");
-        wrapper.innerHTML = "";
-        wrapper.appendChild(iframe);
-        return;
-    }else{
-        video.src = urls[0];
-        video.play().catch(showVideoError);
     }
 }
 
 backendSelect.addEventListener("change", () => {
     const backend = backendSelect.value;
 
-    if (qualitySelect.value === "0" && (backend === "yobi" || backend === "yobiyobi")) {
-        playHLSWithBackend(backend);
-    } else {
-        video.src = qualitySelect.value === "1"
-            ? urls[0]
-            : (urls[1] || urls[0]);
-        video.play().catch(showVideoError);
+    if (qualitySelect.value === "0" && backend === "yobi") {
+        playHLSWithBackend();
+        return;
     }
+
+    if (backend === "yobiyobi") {
+        video.src = "/api/streamurl/yobiyobi?video_id={{ videoid }}";
+        video.play().catch(showVideoError);
+        return;
+    }
+
+    video.src = qualitySelect.value === "1"
+        ? urls[0]
+        : (urls[1] || urls[0]);
+    video.play().catch(showVideoError);
 });
 
 qualitySelect.addEventListener("change", () => {
     const backend = backendSelect.value;
 
-    if (qualitySelect.value === "0" && (backend === "yobi" || backend === "yobiyobi")) {
-        playHLSWithBackend(backend);
-    } else {
-        video.src = qualitySelect.value === "1"
-            ? urls[0]
-            : (urls[1] || urls[0]);
-        video.play().catch(showVideoError);
+    if (qualitySelect.value === "0" && backend === "yobi") {
+        playHLSWithBackend();
+        return;
     }
+
+    if (backend === "yobiyobi") {
+        video.src = "/api/streamurl/yobiyobi?video_id={{ videoid }}";
+        video.play().catch(showVideoError);
+        return;
+    }
+
+    video.src = qualitySelect.value === "1"
+        ? urls[0]
+        : (urls[1] || urls[0]);
+    video.play().catch(showVideoError);
 });
 </script>
 
 </body>
-</html>
+    </html>
