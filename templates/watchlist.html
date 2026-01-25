@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}
+プレイリスト - 仙人tube
+{% endblock %}
+
+{% block content %}
+
+<style>
+/* ===== 検索結果ページと同一UI ===== */
+:root {
+    --bg-main: #f9fafb;
+    --card-bg: #ffffff;
+    --border-soft: #e5e7eb;
+    --shadow-soft: 0 8px 24px rgba(0,0,0,0.06);
+}
+
+body {
+    background: var(--bg-main);
+}
+
+.results-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 28px;
+}
+
+.video-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.video-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.12);
+}
+
+.video-card img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: #e5e7eb;
+}
+
+.video-meta {
+    padding: 14px 16px 18px;
+}
+
+.video-meta h3 {
+    font-size: 15px;
+    line-height: 1.4;
+    margin: 0 0 6px;
+}
+
+.video-meta h3 a {
+    color: #111827;
+    text-decoration: none;
+}
+
+.video-meta h3 a:hover {
+    color: var(--yt-red);
+}
+
+.video-meta p {
+    margin: 2px 0;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+@media (max-width: 640px) {
+    .results-list {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<div class="search-results-container"
+     style="max-width:1200px;margin:24px auto;padding:0 24px;">
+
+    <!-- ===== プレイリスト情報 ===== -->
+    <div style="margin-bottom:24px;">
+        <h2 style="font-size:20px;margin-bottom:4px;">
+            プレイリスト
+        </h2>
+        <p style="color:#6b7280;font-size:14px;">
+            全 {{ videos|length }} 件の動画
+        </p>
+    </div>
+
+    <!-- ===== 動画一覧（省略なし） ===== -->
+    <div class="results-list">
+        {% for v in videos %}
+        <div class="video-card">
+            <a href="/watch?v={{ v.videoId }}&list={{ list_id }}&index={{ loop.index0 }}">
+                <img src="/thumbnail?v={{ v.videoId }}" alt="{{ v.title }}">
+            </a>
+            <div class="video-meta">
+                <h3>
+                    <a href="/watch?v={{ v.videoId }}&list={{ list_id }}&index={{ loop.index0 }}">
+                        {{ v.title }}
+                    </a>
+                </h3>
+                <p>{{ v.author }}</p>
+                <p>{{ v.lengthSeconds }} 秒</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+{% endblock %}
