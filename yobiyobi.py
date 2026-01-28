@@ -51,17 +51,58 @@ def extract_best_progressive(data: dict):
     return videos[0]["url"] if videos else None
 
 
+def extract_1080p_progressive(data: dict):
+    formats = data.get("formatStreams", [])
+    videos = [
+        f for f in formats
+        if f.get("type", "").startswith("video/")
+        and f.get("audioQuality")
+        and f.get("url")
+    ]
+
+    for v in videos:
+        if v.get("qualityLabel") == "1080p":
+            return v["url"]
+
+    videos.sort(key=lambda x: x.get("qualityLabel", ""), reverse=True)
+    return videos[0]["url"] if videos else None
+
+
 # =========================
-# yobi（m3u8 専用）
+# yobi（m3u8 → 1080p fallback）
 # =========================
 
 @app.get("/api/streamurl/yobi")
 def yobi_stream(video_id: str = Query(...)):
+    m3u8_url = urllib.parse.urljoin(M3U8_API, video_id)
+
     try:
-        m3u8_url = urllib.parse.urljoin(M3U8_API, video_id)
-        return RedirectResponse(m3u8_url)
+        r = requests.head(
+            m3u8_url,
+            allow_redirects=True,
+            timeout=6
+        )
+        ct = r.headers.get("Content-Type", "").lower()
+
+        if "mpegurl" in ct or ".m3u8" in r.url:
+            return RedirectResponse(r.url)
     except Exception:
-        raise HTTPException(404)
+        pass
+
+    try:
+        data = get_invidious_video(video_id)
+        url = extract_1080p_progressive(data)
+        if url:
+            return RedirectResponse(url)
+    except Exception:
+        pass
+
+    try:
+        return RedirectResponse(f"{STREAM_API}{video_id}")
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=404)
 
 
 # =========================
