@@ -298,25 +298,12 @@ templates = Jinja2Templates(directory="templates")
 # 高画質ストリーム
 # =========================
 
-HLS_API_BASE_URL = "https://yudlp.vercel.app/m3u8/"
+STREAM_YTDL_API_BASE_URL = "https://yudlp.vercel.app/stream/"
 
 @app.get("/stream/high")
 def stream_high(v: str):
     try:
-        r = requests.get(f"{HLS_API_BASE_URL}{v}", timeout=6)
-        if r.status_code == 200:
-            data = r.json()
-            m3u8s = [f for f in data.get("m3u8_formats", []) if f.get("url")]
-            m3u8_1080 = [f for f in m3u8s if (f.get("resolution") or "").endswith("x1080")]
-            if m3u8_1080:
-                return RedirectResponse(m3u8_1080[0]["url"])
-            if m3u8s:
-                best = sorted(
-                    m3u8s,
-                    key=lambda f: int((f.get("resolution") or "0x0").split("x")[-1]),
-                    reverse=True
-                )[0]
-                return RedirectResponse(best["url"])
+        return RedirectResponse(f"{STREAM_YTDL_API_BASE_URL}{v}")
     except:
         pass
 
@@ -427,7 +414,6 @@ def channel(request: Request, response: Response, cid: str, sennin: Union[str, N
         }
     )
 
-# ★ 追加：登録済みチャンネルページ
 @app.get("/subuscript", response_class=HTMLResponse)
 def subuscript(request: Request, sennin: Union[str, None] = Cookie(None)):
     if not check_cookie(sennin):
@@ -455,7 +441,7 @@ def thumbnail(v: str):
 
 @app.get("/watchlist", response_class=HTMLResponse)
 def watchlist(request: Request, list: str):
-    results = fetch_playlist_all(list)  # 全件取得
+    results = fetch_playlist_all(list)
     return templates.TemplateResponse(
         "watchlist.html",
         {
