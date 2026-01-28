@@ -1,6 +1,7 @@
 import random
 import requests
 import urllib.parse
+
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
 
@@ -39,9 +40,6 @@ def get_invidious_video(video_id: str):
 
 
 def extract_best_progressive(data: dict):
-    """
-    audio+video 統合（HTML <video> 用）
-    """
     formats = data.get("formatStreams", [])
     videos = [
         f for f in formats
@@ -54,16 +52,24 @@ def extract_best_progressive(data: dict):
 
 
 # =========================
-# main endpoint
+# yobi（m3u8 専用）
+# =========================
+
+@app.get("/api/streamurl/yobi")
+def yobi_stream(video_id: str = Query(...)):
+    try:
+        m3u8_url = urllib.parse.urljoin(M3U8_API, video_id)
+        return RedirectResponse(m3u8_url)
+    except Exception:
+        raise HTTPException(404)
+
+
+# =========================
+# yobiyobi（progressive 専用）
 # =========================
 
 @app.get("/api/streamurl/yobiyobi")
 def yobiyobi_stream(video_id: str = Query(...)):
-    """
-    HTML <video src=...> 専用
-    """
-
-    # ① Invidious progressive
     try:
         data = get_invidious_video(video_id)
         url = extract_best_progressive(data)
@@ -72,36 +78,53 @@ def yobiyobi_stream(video_id: str = Query(...)):
     except Exception:
         pass
 
-    # ② ytdl stream API（mux済み想定）
     try:
-        stream_url = urllib.parse.urljoin(STREAM_API, video_id)
-        # HEAD は信用せず即 Redirect
-        return RedirectResponse(stream_url)
+        return RedirectResponse(f"{STREAM_API}{video_id}")
     except Exception:
         pass
 
-    # ③ m3u8 最終フォールバック
+    raise HTTPException(status_code=404)
+
+
+# =========================
+# Content-Type / HEAD 判定
+# =========================
+
+@app.get("/api/streammeta")
+def stream_meta(
+    video_id: str = Query(...),
+    backend: str = Query("main")
+):
+    if backend == "yobi":
+        url = f"/api/streamurl/yobi?video_id={video_id}"
+    elif backend == "yobiyobi":
+        url = f"/api/streamurl/yobiyobi?video_id={video_id}"
+    else:
+        url = f"/api/streamurl?video_id={video_id}"
+
     try:
-        m3u8_url = urllib.parse.urljoin(M3U8_API, video_id)
-        return RedirectResponse(m3u8_url)
+        r = requests.head(
+            url,
+            allow_redirects=True,
+            timeout=6
+        )
+        ct = r.headers.get("Content-Type", "").lower()
+
+        if "mpegurl" in ct:
+            stream_type = "m3u8"
+        elif "video/" in ct:
+            stream_type = "mp4"
+        else:
+            stream_type = "m3u8" if ".m3u8" in r.url else "mp4"
+
+        return JSONResponse({
+            "url": r.url,
+            "type": stream_type,
+            "backend": backend
+        })
+
     except Exception:
-        pass
-
-    raise HTTPException(status_code=404, detail="yobiyobi: stream unavailable")
-
-
-# =========================
-# debug / health
-# =========================
-
-@app.get("/api/streamurl/yobiyobi/health")
-def health():
-    return JSONResponse({
-        "status": "ok",
-        "mode": "yobiyobi",
-        "strategy": [
-            "invidious_progressive",
-            "ytdl_stream_muxed",
-            "m3u8_fallback"
-        ]
-    })
+        return JSONResponse(
+            {"error": "streammeta_failed"},
+            status_code=500
+        )
