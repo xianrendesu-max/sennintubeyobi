@@ -199,7 +199,7 @@
 </div>
 
 <div class="actions">
-    <a class="action-btn primary" href="{{ videourls[0] }}" target="_blank">⬇ ダウンロード</a>
+    <a id="downloadBtn" class="action-btn primary" href="#">⬇ ダウンロード</a>
 </div>
 
 <div class="description">
@@ -430,7 +430,26 @@ qualitySelect.addEventListener("change", resolveAndPlayWithFailover);
 
 resolveAndPlayWithFailover();
 </script>
-<!-- ===================== 追記ここまで ===================== -->
+
+<script>
+const downloadBtn = document.getElementById("downloadBtn");
+
+downloadBtn.addEventListener("click", function(e){
+    e.preventDefault();
+
+    let base;
+    if (backendSelect.value === "yobi") {
+        base = "/api/streamurl/yobi";
+    } else if (backendSelect.value === "yobiyobi") {
+        base = "/api/streamurl/yobiyobi";
+    } else {
+        base = "/api/streamurl";
+    }
+
+    const url = `${base}?video_id={{ videoid }}&mode=download`;
+    window.open(url, "_blank");
+});
+</script>
 
 </body>
-        </html>
+</html>
