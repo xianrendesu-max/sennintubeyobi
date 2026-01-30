@@ -306,22 +306,24 @@ M3U8_API   = "https://ytdl-0et1.onrender.com/m3u8/"
 
 @app.get("/stream/high")
 def stream_high(v: str):
-    try:
-        return RedirectResponse(f"{STREAM_API}{v}")
-    except:
-        pass
-
+    # ① m3u8（manifest.googlevideo 相当）を最優先
     try:
         return RedirectResponse(f"{M3U8_API}{v}")
     except:
         pass
 
+    # ② stream（直 video/googlevideo）
+    try:
+        return RedirectResponse(f"{STREAM_API}{v}")
+    except:
+        pass
+
+    # ③ Invidious の hlsUrl（これも中身は manifest.googlevideo）
     t = json.loads(apirequest("api/v1/videos/" + urllib.parse.quote(v)))
     if t.get("hlsUrl"):
         return RedirectResponse(t["hlsUrl"])
 
     raise HTTPException(status_code=503, detail="High quality stream unavailable")
-
 # =========================
 # ルーティング
 # =========================
