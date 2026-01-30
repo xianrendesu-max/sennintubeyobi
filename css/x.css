@@ -1,0 +1,109 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #15202b;
+    color: #e7e9ea;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, Helvetica, Arial, sans-serif;
+}
+
+a {
+    color: #1d9bf0;
+    text-decoration: none;
+}
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #15202b;
+    border-bottom: 1px solid #2f3336;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo a {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.searchbox {
+    flex: 1;
+    display: flex;
+}
+
+.searchbox input {
+    flex: 1;
+    background: #273340;
+    border: none;
+    border-radius: 999px;
+    padding: 8px 14px;
+    color: #e7e9ea;
+    outline: none;
+}
+
+.searchbox button {
+    margin-left: 8px;
+    background: #1d9bf0;
+    border: none;
+    border-radius: 999px;
+    padding: 8px 16px;
+    color: white;
+    cursor: pointer;
+}
+
+.timeline {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.tweet {
+    border-bottom: 1px solid #2f3336;
+    padding: 12px;
+}
+
+.tweet:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+.tweet-body {
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.tweet-text {
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.media-grid {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 4px;
+}
+
+.media-grid img,
+.media-grid video {
+    width: 100%;
+    border-radius: 12px;
+    background: black;
+}
+
+.empty {
+    text-align: center;
+    padding: 40px;
+    color: #8899a6;
+}
+
+/* モバイル最適化 */
+@media (max-width: 600px) {
+    .timeline {
+        width: 100%;
+    }
+}
