@@ -1,65 +1,174 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="utf-8">
-    <title>X 検索 - {{ query }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>{{ channelname }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <link rel="stylesheet" href="/css/x.css">
+    <link rel="stylesheet" href="/css/style.css">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0f0f0f;
+            color: #ffffff;
+        }
+
+        .cover {
+            width: 100%;
+            height: 180px;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .channel-header {
+            padding: 16px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .channel-icon {
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+        }
+
+        .channel-info {
+            flex: 1;
+        }
+
+        .channel-name {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .subscriber {
+            color: #aaa;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .channel-profile {
+            padding: 0 16px 16px 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #ddd;
+        }
+
+        .actions {
+            padding: 0 16px 16px 16px;
+        }
+
+        .twitter-link {
+            display: inline-block;
+            padding: 10px 18px;
+            background: #1d9bf0;
+            color: #ffffff;
+            border-radius: 999px;
+            font-size: 14px;
+            text-decoration: none;
+        }
+
+        .twitter-link:hover {
+            opacity: 0.9;
+        }
+
+        .video-list {
+            padding: 0 16px 32px 16px;
+        }
+
+        .video-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #222;
+            text-decoration: none;
+            color: #fff;
+        }
+
+        .video-thumb {
+            width: 160px;
+            height: 90px;
+            background: #000;
+            flex-shrink: 0;
+        }
+
+        .video-info {
+            flex: 1;
+        }
+
+        .video-title {
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .video-meta {
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
 </head>
 <body>
 
-<header class="topbar">
-    <div class="logo">
-        <a href="/">X</a>
+{% if cover_img_url %}
+<div
+    class="cover"
+    style="background-image: url('{{ cover_img_url }}');">
+</div>
+{% endif %}
+
+<div class="channel-header">
+    <img
+        src="{{ channelicon }}"
+        class="channel-icon"
+        alt="icon"
+    >
+
+    <div class="channel-info">
+        <div class="channel-name">{{ channelname }}</div>
+        {% if subscribers_count %}
+        <div class="subscriber">{{ subscribers_count }}</div>
+        {% endif %}
     </div>
-    <form class="searchbox" action="/x/search" method="get">
-        <input type="text" name="q" value="{{ query }}" placeholder="検索">
-        <button type="submit">検索</button>
-    </form>
-</header>
+</div>
 
-<main class="timeline">
+{% if channelprofile %}
+<div class="channel-profile">
+    {{ channelprofile }}
+</div>
+{% endif %}
 
-    {% if tweets|length == 0 %}
-        <div class="empty">
-            結果がありません
+<div class="actions">
+    <a
+        href="/x/search?q={{ channelname | urlencode }}"
+        class="twitter-link"
+    >
+        Twitter
+    </a>
+</div>
+
+<div class="video-list">
+    {% for v in results %}
+    <a href="/watch?v={{ v.id }}" class="video-item">
+        <img
+            class="video-thumb"
+            src="/thumbnail?v={{ v.id }}"
+            alt="thumbnail"
+        >
+        <div class="video-info">
+            <div class="video-title">
+                {{ v.title }}
+            </div>
+            <div class="video-meta">
+                {{ v.view_count_text }} {{ v.length_str }}
+            </div>
         </div>
-    {% endif %}
-
-    {% for tweet in tweets %}
-    <article class="tweet">
-
-        <div class="tweet-body">
-            <div class="tweet-text">
-                {{ tweet.text | replace("\n", "<br>") | safe }}
-            </div>
-
-            {% if tweet.images %}
-            <div class="media-grid">
-                {% for img in tweet.images %}
-                <a href="{{ img }}" target="_blank">
-                    <img src="{{ img }}" loading="lazy">
-                </a>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {% if tweet.videos %}
-            <div class="media-grid">
-                {% for video in tweet.videos %}
-                <video controls preload="none">
-                    <source src="{{ video }}">
-                </video>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-
-    </article>
+    </a>
     {% endfor %}
-
-</main>
+</div>
 
 </body>
 </html>
