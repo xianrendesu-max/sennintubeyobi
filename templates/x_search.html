@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>X 検索 - {{ query }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="/css/x.css">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="logo">
+        <a href="/">X</a>
+    </div>
+    <form class="searchbox" action="/x/search" method="get">
+        <input type="text" name="q" value="{{ query }}" placeholder="検索">
+        <button type="submit">検索</button>
+    </form>
+</header>
+
+<main class="timeline">
+
+    {% if tweets|length == 0 %}
+        <div class="empty">
+            結果がありません
+        </div>
+    {% endif %}
+
+    {% for tweet in tweets %}
+    <article class="tweet">
+
+        <div class="tweet-body">
+            <div class="tweet-text">
+                {{ tweet.text | replace("\n", "<br>") | safe }}
+            </div>
+
+            {% if tweet.images %}
+            <div class="media-grid">
+                {% for img in tweet.images %}
+                <a href="{{ img }}" target="_blank">
+                    <img src="{{ img }}" loading="lazy">
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if tweet.videos %}
+            <div class="media-grid">
+                {% for video in tweet.videos %}
+                <video controls preload="none">
+                    <source src="{{ video }}">
+                </video>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+    </article>
+    {% endfor %}
+
+</main>
+
+</body>
+</html>
