@@ -1,4 +1,4 @@
 fastapi
 uvicorn[standard]
-httpx
+httpx[http2]
 jinja2
