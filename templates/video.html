@@ -199,7 +199,7 @@
 </div>
 
 <div class="actions">
-    <a id="downloadBtn" class="action-btn primary" href="#">⬇ ダウンロード</a>
+    <a id="downloadBtn" class="action-btn primary" href="javascript:void(0)">⬇ ダウンロード</a>
 </div>
 
 <div class="description">
@@ -365,70 +365,6 @@ qualitySelect.addEventListener("change", () => {
         video.play().catch(showVideoError);
     }
 });
-</script>
-
-<!-- ===================== ここから追記（既存コードは一切変更なし） ===================== -->
-<script>
-async function resolveAndPlayWithFailover(){
-    const order = [
-        backendSelect.value,
-        backendSelect.value === "yobi" ? "yobiyobi" : "yobi",
-        "main"
-    ];
-
-    for (const backend of order) {
-        try {
-            const res = await fetch(
-                `/api/streammeta?video_id={{ videoid }}&backend=${backend}`
-            );
-            if (!res.ok) continue;
-
-            const meta = await res.json();
-            if (!meta.url || !meta.type) continue;
-
-            backendSelect.value = backend;
-
-            if (meta.type === "m3u8") {
-                playResolvedHLS(meta.url);
-            } else {
-                playResolvedMP4(meta.url);
-            }
-            return;
-        } catch(e){}
-    }
-    showVideoError();
-}
-
-function playResolvedHLS(url){
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = url;
-        video.play().catch(showVideoError);
-        return;
-    }
-
-    if (hlsPlayer) hlsPlayer.destroy();
-    hlsPlayer = new Hls();
-    hlsPlayer.loadSource(url);
-    hlsPlayer.attachMedia(video);
-
-    hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(showVideoError);
-    });
-
-    hlsPlayer.on(Hls.Events.ERROR, resolveAndPlayWithFailover);
-}
-
-function playResolvedMP4(url){
-    if (hlsPlayer) hlsPlayer.destroy();
-    if (dashPlayer) dashPlayer.reset();
-    video.src = url;
-    video.play().catch(showVideoError);
-}
-
-backendSelect.addEventListener("change", resolveAndPlayWithFailover);
-qualitySelect.addEventListener("change", resolveAndPlayWithFailover);
-
-resolveAndPlayWithFailover();
 </script>
 
 <script>
