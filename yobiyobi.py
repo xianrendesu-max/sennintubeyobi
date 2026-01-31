@@ -10,8 +10,8 @@ yobiyobi = Blueprint("yobiyobi", __name__)
 # 設定
 # =========================================================
 
-STREAM_API = "https://example.com/api/stream/"
-M3U8_API   = "https://example.com/api/m3u8/"
+STREAM_API = "https://ytdl-0et1.onrender.com/api/stream/"
+M3U8_API   = "https://ytdl-0et1.onrender.com/m3u8/"
 
 INVIDIOUS_INSTANCES = [
     'https://inv.nadeko.net',
