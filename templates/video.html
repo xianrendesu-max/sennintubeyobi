@@ -374,15 +374,23 @@ downloadBtn.addEventListener("click", function(e){
     e.preventDefault();
 
     let base;
+    let forceHLS = false;
+
     if (backendSelect.value === "yobi") {
         base = "/api/streamurl/yobi";
     } else if (backendSelect.value === "yobiyobi") {
         base = "/api/streamurl/yobiyobi";
+        forceHLS = true; // yobiyobi は必ず HLS
     } else {
         base = "/api/streamurl";
     }
 
-    const url = `${base}?video_id={{ videoid }}&mode=download`;
+    let url = `${base}?video_id={{ videoid }}&mode=download`;
+
+    if(forceHLS){
+        url += "&format=m3u8"; // サーバー側で HLS に固定
+    }
+
     window.open(url, "_blank");
 });
 </script>
