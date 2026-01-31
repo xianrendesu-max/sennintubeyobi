@@ -1,86 +1,150 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>m3u8</title>
+    <meta charset="UTF-8">
+    <title>動画プレイヤー - 仙人tube</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="/css/pure-min.css">
+    <link rel="stylesheet" href="/css/grids-responsive-min.css">
+    <link rel="stylesheet" href="/css/default.css">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
 <style>
     body, html {
         margin: 0;
         padding: 0;
+        background: black;
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background-color: black;
-    }
-    #video-container {
-        width: 100%;
-        height: 100%;
         display: flex;
         justify-content: center;
         align-items: center;
     }
-    #video-player {
+
+    #video-wrapper {
+        position: relative;
         width: 100%;
         height: 100%;
-        object-fit: contain;
-        background-color: black;
     }
-    #video-error {
+
+    #videoPlayer {
+        width: 100%;
+        height: 100%;
+        background: black;
+        object-fit: contain;
+    }
+
+    .video-error-alert {
         position: absolute;
         top: 20px;
         left: 50%;
         transform: translateX(-50%);
+        background: #ef4444;
         color: white;
-        background-color: red;
-        padding: 10px 20px;
-        border-radius: 8px;
+        padding: 12px 40px 12px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        z-index: 10;
         display: none;
-        font-family: sans-serif;
-        z-index: 100;
+    }
+
+    .video-error-alert .close-btn {
+        position: absolute;
+        top: 6px;
+        right: 10px;
+        font-size: 18px;
+        cursor: pointer;
+        line-height: 1;
+        opacity: 0.8;
+    }
+
+    .video-error-alert .close-btn:hover {
+        opacity: 1;
     }
 </style>
 </head>
 <body>
 
-<div id="video-container">
-    <video id="video-player" controls playsinline>
-        ブラウザがこの形式の動画ストリームをサポートしていません。
-    </video>
+<div id="video-wrapper">
+    <div id="videoError" class="video-error-alert">
+        ⚠ 動画の取得に失敗しました
+        <span class="close-btn" onclick="hideVideoError()">×</span>
+    </div>
+
+    <video id="videoPlayer" controls playsinline></video>
 </div>
-<div id="video-error">⚠ 動画を再生できませんでした。</div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
-const video = document.getElementById('video-player');
-const errorBox = document.getElementById('video-error');
+const params = new URLSearchParams(location.search);
+const videoId = params.get("video_id");
+const backend = params.get("backend") || "yobiyobi";
 
-// Flask/Jinja2 から渡された URL
-const videoURL = "{{ video_url }}";
+const video = document.getElementById("videoPlayer");
+let hlsPlayer = null;
 
-function showError() {
-    errorBox.style.display = "block";
-    console.error("動画再生エラー:", videoURL);
+function showVideoError(){
+    document.getElementById("videoError").style.display = "block";
 }
 
-// Safari/iOS ネイティブ再生対応
-if(video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = videoURL;
-    video.play().catch(showError);
-} else if(Hls.isSupported()) {
-    const hls = new Hls();
-    hls.loadSource(videoURL);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(showError);
-    });
-    hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error("HLS.js error:", data);
-        showError();
-    });
-} else {
-    // HLS非対応ブラウザ
-    showError();
+function hideVideoError(){
+    document.getElementById("videoError").style.display = "none";
+}
+
+function playHLS(url){
+    if(video.canPlayType("application/vnd.apple.mpegurl")){
+        video.src = url;
+        video.play().catch(showVideoError);
+        return;
+    }
+
+    if(Hls.isSupported()){
+        if(hlsPlayer){
+            hlsPlayer.destroy();
+        }
+        hlsPlayer = new Hls();
+        hlsPlayer.loadSource(url);
+        hlsPlayer.attachMedia(video);
+
+        hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play().catch(showVideoError);
+        });
+
+        hlsPlayer.on(Hls.Events.ERROR, () => {
+            showVideoError();
+        });
+        return;
+    }
+
+    showVideoError();
+}
+
+async function resolveAndPlay(){
+    try{
+        const res = await fetch(
+            `/api/streammeta?backend=${backend}&mode=download&video_id=${videoId}`
+        );
+
+        if(!res.ok) throw "fetch error";
+
+        const data = await res.json();
+        if(!data.url) throw "no url";
+
+        playHLS(data.url);
+    }catch(e){
+        showVideoError();
+    }
+}
+
+if(videoId){
+    resolveAndPlay();
+}else{
+    showVideoError();
 }
 </script>
 
