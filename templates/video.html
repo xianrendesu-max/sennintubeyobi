@@ -341,22 +341,24 @@ function setMode(mode){
 }
 
 backendSelect.addEventListener("change", () => {
-    const backend = backendSelect.value;
+    if(backendSelect.value !== "yobiyobi"){
+        const backend = backendSelect.value;
 
-    if (qualitySelect.value === "0" && (backend === "yobi" || backend === "yobiyobi")) {
-        playHLSWithBackend(backend);
-    } else {
-        video.src = qualitySelect.value === "1"
-            ? urls[0]
-            : (urls[1] || urls[0]);
-        video.play().catch(showVideoError);
+        if (qualitySelect.value === "0" && (backend === "yobi" || backend === "main")) {
+            playHLSWithBackend(backend);
+        } else {
+            video.src = qualitySelect.value === "1"
+                ? urls[0]
+                : (urls[1] || urls[0]);
+            video.play().catch(showVideoError);
+        }
     }
 });
 
 qualitySelect.addEventListener("change", () => {
     const backend = backendSelect.value;
 
-    if (qualitySelect.value === "0" && (backend === "yobi" || backend === "yobiyobi")) {
+    if (qualitySelect.value === "0" && (backend === "yobi" || backend === "main")) {
         playHLSWithBackend(backend);
     } else {
         video.src = qualitySelect.value === "1"
@@ -369,6 +371,43 @@ qualitySelect.addEventListener("change", () => {
 
 <!-- ===================== ここから追記（既存コードは一切変更なし） ===================== -->
 <script>
+const originalVideoHTML = document.querySelector(".player-wrapper").innerHTML;
+
+function updatePlayer(){
+    const backend = backendSelect.value;
+    const wrapper = document.querySelector(".player-wrapper");
+
+    if(backend === "yobiyobi"){
+        // HLS埋め込み用iframe
+        const iframe = document.createElement("iframe");
+        const url = `/emobedhigh.html?src=${encodeURIComponent(getStreamBase() + "?video_id={{ videoid }}")}`;
+        iframe.src = url;
+        iframe.width = "100%";
+        iframe.height = "480";
+        iframe.style.border = "none";
+
+        wrapper.innerHTML = "";
+        wrapper.appendChild(iframe);
+    } else {
+        // 元のvideoタグに戻す
+        wrapper.innerHTML = originalVideoHTML;
+        const video = document.getElementById("videoPlayer");
+        if(video){
+            video.src = urls[1] || urls[0];
+            video.onerror = showVideoError;
+        }
+    }
+}
+
+// backend変更時に呼び出す
+backendSelect.addEventListener("change", () => {
+    updatePlayer();
+    resolveAndPlayWithFailover();
+});
+
+// 初期ロード時にも呼ぶ
+updatePlayer();
+
 async function resolveAndPlayWithFailover(){
     const order = [
         backendSelect.value,
