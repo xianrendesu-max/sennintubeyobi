@@ -178,15 +178,13 @@
 <div class="main-grid">
 
 <div>
-<div class="player-wrapper" style="position:relative">
+<div class="player-wrapper" id="playerWrapper" style="position:relative">
     <div id="videoError" class="video-error-alert" style="display:none">
         ⚠ 動画の取得に失敗しました。別の再生方法をお試しください。
         <span class="close-btn" onclick="hideVideoError()">×</span>
     </div>
 
-    <video id="videoPlayer" controls
-        poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg">
-    </video>
+    <video id="videoPlayer" controls poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg"></video>
 </div>
 
 <div class="video-title">{{ videotitle }}</div>
@@ -249,227 +247,41 @@
 </div>
 
 <script>
-const urls = {{ videourls | tojson }};
-const dash = {{ dash | tojson }};
-const video = document.getElementById("videoPlayer");
 const backendSelect = document.getElementById("backendSelect");
 const qualitySelect = document.getElementById("qualitySelect");
-const errorAlert = document.getElementById("videoError");
-
-let dashPlayer = null;
+const wrapper = document.getElementById("playerWrapper");
+const video = document.getElementById("videoPlayer");
 let hlsPlayer = null;
 
-function showVideoError(){
-    errorAlert.style.display = "block";
-    errorAlert.style.animation = "none";
-    errorAlert.offsetHeight;
-    errorAlert.style.animation = null;
+// 元の動画プレイヤーに戻す関数
+function restoreVideoPlayer(){
+    wrapper.innerHTML = `<video id="videoPlayer" controls poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg"></video>`;
+    const newVideo = document.getElementById("videoPlayer");
+    newVideo.src = "{{ videourls[0] }}";
+    newVideo.play().catch(()=>{});
 }
 
-function hideVideoError(){
-    errorAlert.style.display = "none";
+// emobedhigh.html を埋め込む関数
+function embedEmobedHigh(){
+    wrapper.innerHTML = `<iframe src="/emobedhigh.html?src=/api/streamurl/yobiyobi?video_id={{ videoid }}" style="width:100%;height:480px;border:none;"></iframe>`;
 }
 
-video.onerror = showVideoError;
-
-function getStreamBase(){
-    if (backendSelect.value === "yobi") return "/api/streamurl/yobi";
-    if (backendSelect.value === "yobiyobi") return "/api/streamurl/yobiyobi";
-    return "/api/streamurl";
-}
-
-video.src = urls[1] || urls[0];
-
-function playHLSWithBackend(backend){
-    const url = getStreamBase() + "?video_id={{ videoid }}";
-
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = url;
-        video.play().catch(showVideoError);
-        return;
-    }
-
-    if (hlsPlayer) {
-        hlsPlayer.destroy();
-        hlsPlayer = null;
-    }
-
-    if (Hls.isSupported()) {
-        hlsPlayer = new Hls();
-
-        hlsPlayer.loadSource(url);
-        hlsPlayer.attachMedia(video);
-
-        hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-            video.play().catch(showVideoError);
-        });
-
-        hlsPlayer.on(Hls.Events.ERROR, function () {
-            showVideoError();
-            if (backend === "yobi") {
-                backendSelect.value = "yobiyobi";
-                playHLSWithBackend("yobiyobi");
-            }
-        });
+// backendSelect が変わった時の動作
+backendSelect.addEventListener("change", ()=>{
+    if(backendSelect.value === "yobiyobi"){
+        embedEmobedHigh();
     } else {
-        video.src = url;
-        video.play().catch(showVideoError);
-    }
-}
-
-function setMode(mode){
-    if(dashPlayer){
-        dashPlayer.reset();
-        dashPlayer = null;
-    }
-
-    if(mode === "nocookie"){
-        const iframe = document.createElement("iframe");
-        iframe.src = "{{ nocookie_url }}?autoplay=1";
-        iframe.style.width = "100%";
-        iframe.style.height = "480px";
-        iframe.style.border = "none";
-
-        const wrapper = document.querySelector(".player-wrapper");
-        wrapper.innerHTML = "";
-        wrapper.appendChild(iframe);
-        return;
-    }else{
-        video.src = urls[0];
-        video.play().catch(showVideoError);
-    }
-}
-
-backendSelect.addEventListener("change", () => {
-    if(backendSelect.value !== "yobiyobi"){
-        const backend = backendSelect.value;
-
-        if (qualitySelect.value === "0" && (backend === "yobi" || backend === "main")) {
-            playHLSWithBackend(backend);
-        } else {
-            video.src = qualitySelect.value === "1"
-                ? urls[0]
-                : (urls[1] || urls[0]);
-            video.play().catch(showVideoError);
-        }
+        restoreVideoPlayer();
     }
 });
 
-qualitySelect.addEventListener("change", () => {
-    const backend = backendSelect.value;
-
-    if (qualitySelect.value === "0" && (backend === "yobi" || backend === "main")) {
-        playHLSWithBackend(backend);
-    } else {
-        video.src = qualitySelect.value === "1"
-            ? urls[0]
-            : (urls[1] || urls[0]);
-        video.play().catch(showVideoError);
-    }
-});
+// ページロード時も backend が yobiyobi なら iframe に切り替え
+if(backendSelect.value === "yobiyobi"){
+    embedEmobedHigh();
+} else {
+    restoreVideoPlayer();
+}
 </script>
-
-<!-- ===================== ここから追記（既存コードは一切変更なし） ===================== -->
-<script>
-const originalVideoHTML = document.querySelector(".player-wrapper").innerHTML;
-
-function updatePlayer(){
-    const backend = backendSelect.value;
-    const wrapper = document.querySelector(".player-wrapper");
-
-    if(backend === "yobiyobi"){
-        // HLS埋め込み用iframe
-        const iframe = document.createElement("iframe");
-        const url = `/emobedhigh.html?src=${encodeURIComponent(getStreamBase() + "?video_id={{ videoid }}")}`;
-        iframe.src = url;
-        iframe.width = "100%";
-        iframe.height = "480";
-        iframe.style.border = "none";
-
-        wrapper.innerHTML = "";
-        wrapper.appendChild(iframe);
-    } else {
-        // 元のvideoタグに戻す
-        wrapper.innerHTML = originalVideoHTML;
-        const video = document.getElementById("videoPlayer");
-        if(video){
-            video.src = urls[1] || urls[0];
-            video.onerror = showVideoError;
-        }
-    }
-}
-
-// backend変更時に呼び出す
-backendSelect.addEventListener("change", () => {
-    updatePlayer();
-    resolveAndPlayWithFailover();
-});
-
-// 初期ロード時にも呼ぶ
-updatePlayer();
-
-async function resolveAndPlayWithFailover(){
-    const order = [
-        backendSelect.value,
-        backendSelect.value === "yobi" ? "yobiyobi" : "yobi",
-        "main"
-    ];
-
-    for (const backend of order) {
-        try {
-            const res = await fetch(
-                `/api/streammeta?video_id={{ videoid }}&backend=${backend}`
-            );
-            if (!res.ok) continue;
-
-            const meta = await res.json();
-            if (!meta.url || !meta.type) continue;
-
-            backendSelect.value = backend;
-
-            if (meta.type === "m3u8") {
-                playResolvedHLS(meta.url);
-            } else {
-                playResolvedMP4(meta.url);
-            }
-            return;
-        } catch(e){}
-    }
-    showVideoError();
-}
-
-function playResolvedHLS(url){
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = url;
-        video.play().catch(showVideoError);
-        return;
-    }
-
-    if (hlsPlayer) hlsPlayer.destroy();
-    hlsPlayer = new Hls();
-    hlsPlayer.loadSource(url);
-    hlsPlayer.attachMedia(video);
-
-    hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(showVideoError);
-    });
-
-    hlsPlayer.on(Hls.Events.ERROR, resolveAndPlayWithFailover);
-}
-
-function playResolvedMP4(url){
-    if (hlsPlayer) hlsPlayer.destroy();
-    if (dashPlayer) dashPlayer.reset();
-    video.src = url;
-    video.play().catch(showVideoError);
-}
-
-backendSelect.addEventListener("change", resolveAndPlayWithFailover);
-qualitySelect.addEventListener("change", resolveAndPlayWithFailover);
-
-resolveAndPlayWithFailover();
-</script>
-<!-- ===================== 追記ここまで ===================== -->
 
 </body>
 </html>
