@@ -1,321 +1,285 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <title>{{ videotitle }} - 仙人tube</title>
-    <link rel="stylesheet" href="/css/pure-min.css">
-    <link rel="stylesheet" href="/css/grids-responsive-min.css">
-    <link rel="stylesheet" href="/css/default.css">
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<!DOCTYPE html>  <html lang="ja">    <head>    
+    <title>{{ videotitle }} - 仙人tube</title>    
+    <link rel="stylesheet" href="/css/pure-min.css">    
+    <link rel="stylesheet" href="/css/grids-responsive-min.css">    
+    <link rel="stylesheet" href="/css/default.css">    
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">    
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>    
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>  <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>    
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>  <style>    
+    body {    
+        margin: 0;    
+        background: #f9fafb;    
+        font-family: "Segoe UI","Hiragino Kaku Gothic ProN",sans-serif;    
+        color: #0f172a;    
+    }    
+    
+    a { text-decoration: none; color: inherit; }    
+    
+    .container {    
+        max-width: 1400px;    
+        margin: 0 auto;    
+        padding: 20px;    
+    }    
+    
+    .main-grid {    
+        display: grid;    
+        grid-template-columns: 1fr 360px;    
+        gap: 24px;    
+    }    
+    
+    @media (max-width: 900px) {    
+        .main-grid { grid-template-columns: 1fr; }    
+    }    
+    
+    .player-wrapper {    
+        position: relative;    
+        width: 100%;    
+        aspect-ratio: 16 / 9;    
+        background: black;    
+        border-radius: 14px;    
+        overflow: hidden;    
+    }    
+    
+    .player-wrapper video,    
+    .player-wrapper iframe {    
+        position: absolute;    
+        top: 0;    
+        left: 0;    
+        width: 100%;    
+        height: 100%;    
+        border: none;    
+    }    
+    
+    .video-title {    
+        font-size: 20px;    
+        font-weight: 600;    
+        margin: 12px 0;    
+    }    
+    
+    .channel-row {    
+        display: flex;    
+        align-items: center;    
+        gap: 12px;    
+        margin: 12px 0;    
+    }    
+    
+    .channel-row img {    
+        width: 48px;    
+        height: 48px;    
+        border-radius: 50%;    
+    }    
+    
+    .actions {    
+        display: flex;    
+        gap: 10px;    
+        margin: 12px 0;    
+        flex-wrap: wrap;    
+    }    
+    
+    .action-btn {    
+        padding: 8px 14px;    
+        border-radius: 999px;    
+        border: 1px solid #d1d5db;    
+        background: white;    
+        cursor: pointer;    
+    }    
+    
+    .action-btn.primary {    
+        background: #2563eb;    
+        color: white;    
+        border: none;    
+    }    
+    
+    .description {    
+        background: #f1f5f9;    
+        border-radius: 12px;    
+        padding: 14px;    
+        font-size: 14px;    
+        line-height: 1.6;    
+    }    
+    
+    .option-box {    
+        margin-top: 12px;    
+        display: flex;    
+        gap: 10px;    
+        flex-wrap: wrap;    
+    }    
+    
+    .option-box select,    
+    .option-box button {    
+        padding: 6px 12px;    
+        border-radius: 999px;    
+        border: 1px solid #d1d5db;    
+        background: white;    
+        cursor: pointer;    
+    }    
+    
+    .related {    
+        display: flex;    
+        flex-direction: column;    
+        gap: 12px;    
+    }    
+    
+    .related-item {    
+        display: flex;    
+        gap: 10px;    
+    }    
+    
+    .related-thumb {    
+        width: 160px;    
+        aspect-ratio: 16 / 9;    
+        border-radius: 10px;    
+        overflow: hidden;    
+    }    
+    
+    .related-thumb img {    
+        width: 100%;    
+        height: 100%;    
+        object-fit: cover;    
+    }    
+    
+    .video-error-alert {    
+        position: absolute;    
+        top: 20px;    
+        left: 50%;    
+        transform: translateX(-50%) translateY(-20px);    
+        background: #ef4444;    
+        color: white;    
+        padding: 12px 40px 12px 20px;    
+        border-radius: 12px;    
+        font-size: 14px;    
+        opacity: 0;    
+        pointer-events: auto;    
+        animation: slideFade 0.4s ease forwards;    
+        z-index: 10;    
+    }    
+    
+    .video-error-alert .close-btn {    
+        position: absolute;    
+        top: 6px;    
+        right: 10px;    
+        font-size: 18px;    
+        cursor: pointer;    
+        line-height: 1;    
+        opacity: 0.8;    
+    }    
+    
+    .video-error-alert .close-btn:hover {    
+        opacity: 1;    
+    }    
+    
+    @keyframes slideFade {    
+        to {    
+            opacity: 1;    
+            transform: translateX(-50%) translateY(0);    
+        }    
+    }    
+</style>  </head>  <body>    {% include "base.html" %}  <div class="container">
 
-    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-
-<style>
-    body {
-        margin: 0;
-        background: #f9fafb;
-        font-family: "Segoe UI","Hiragino Kaku Gothic ProN",sans-serif;
-        color: #0f172a;
-    }
-
-    a { text-decoration: none; color: inherit; }
-
-    .container {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-
-    .main-grid {
-        display: grid;
-        grid-template-columns: 1fr 360px;
-        gap: 24px;
-    }
-
-    @media (max-width: 900px) {
-        .main-grid { grid-template-columns: 1fr; }
-    }
-
-    .player-wrapper video {
-        width: 100%;
-        background: black;
-        border-radius: 14px;
-    }
-
-    .video-title {
-        font-size: 20px;
-        font-weight: 600;
-        margin: 12px 0;
-    }
-
-    .channel-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin: 12px 0;
-    }
-
-    .channel-row img {
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-    }
-
-    .actions {
-        display: flex;
-        gap: 10px;
-        margin: 12px 0;
-        flex-wrap: wrap;
-    }
-
-    .action-btn {
-        padding: 8px 14px;
-        border-radius: 999px;
-        border: 1px solid #d1d5db;
-        background: white;
-        cursor: pointer;
-    }
-
-    .action-btn.primary {
-        background: #2563eb;
-        color: white;
-        border: none;
-    }
-
-    .description {
-        background: #f1f5f9;
-        border-radius: 12px;
-        padding: 14px;
-        font-size: 14px;
-        line-height: 1.6;
-    }
-
-    .option-box {
-        margin-top: 12px;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    .option-box select,
-    .option-box button {
-        padding: 6px 12px;
-        border-radius: 999px;
-        border: 1px solid #d1d5db;
-        background: white;
-        cursor: pointer;
-    }
-
-    .related {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .related-item {
-        display: flex;
-        gap: 10px;
-    }
-
-    .related-thumb {
-        width: 160px;
-        aspect-ratio: 16 / 9;
-        border-radius: 10px;
-        overflow: hidden;
-    }
-
-    .related-thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .video-error-alert {
-        position: absolute;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%) translateY(-20px);
-        background: #ef4444;
-        color: white;
-        padding: 12px 40px 12px 20px;
-        border-radius: 12px;
-        font-size: 14px;
-        opacity: 0;
-        pointer-events: auto;
-        animation: slideFade 0.4s ease forwards;
-        z-index: 10;
-    }
-
-    .video-error-alert .close-btn {
-        position: absolute;
-        top: 6px;
-        right: 10px;
-        font-size: 18px;
-        cursor: pointer;
-        line-height: 1;
-        opacity: 0.8;
-    }
-
-    .video-error-alert .close-btn:hover {
-        opacity: 1;
-    }
-
-    @keyframes slideFade {
-        to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-    }
-</style>
-</head>
-
-<body>
-{% include "base.html" %}
-
-<div class="container">
-<div class="main-grid">
-
-<div>
-<div class="player-wrapper" style="position:relative">
-    <div id="videoError" class="video-error-alert" style="display:none">
-        ⚠ 動画の取得に失敗しました。別の再生方法をお試しください。
-        <span class="close-btn" onclick="hideVideoError()">×</span>
-    </div>
-
-    <video id="videoPlayer" controls
-        poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg">
-    </video>
-</div>
-
-<div class="video-title">{{ videotitle }}</div>
-
-<div class="channel-row">
-    <a href="/channel/{{authorid}}">
-        <img src="{{authoricon}}">
-    </a>
-    <div>{{ author }}</div>
-</div>
-
-<div class="actions">
-    <a class="action-btn primary" href="{{ videourls[0] }}" target="_blank">⬇ ダウンロード</a>
-</div>
-
-<div class="description">
-{{ description | safe }}
-
-<div class="option-box">
-    <select id="qualitySelect">
-        <option value="0">高画質</option>
-        <option value="1">低画質</option>
-    </select>
-</div>
-</div>
-
-<div class="option-box">
-    <button onclick="setMode('nocookie')">nocookie再生</button>
-    <button onclick="setMode('stream')">stream再生</button>
-
-    <select id="backendSelect">
-        <option value="main">main</option>
-        <option value="yobi">yobi</option>
-        <option value="yobiyobi">yobiyobi</option>
-    </select>
-</div>
-
-<div style="margin-top:24px">
-    <iframe src="/comments?v={{ videoid }}"
-        style="width:100%;border:none;min-height:600px">
-    </iframe>
-</div>
-</div>
-
-<div class="related">
-{% for re in res %}
-<a href="/watch?v={{ re['id'] }}" class="related-item">
-    <div class="related-thumb">
-        <img src="https://img.youtube.com/vi/{{ re['id'] }}/0.jpg">
-    </div>
-    <div>
-        <div>{{ re["title"] }}</div>
-        <div style="font-size:12px;color:#64748b">{{ re["author"] }}</div>
-    </div>
-</a>
-{% endfor %}
-</div>
-
-</div>
-</div>
-
-<script>
-const urls = {{ videourls | tojson }};
-const dash = {{ dash | tojson }};
-const video = document.getElementById("videoPlayer");
-const backendSelect = document.getElementById("backendSelect");
-const qualitySelect = document.getElementById("qualitySelect");
-const errorAlert = document.getElementById("videoError");
-
-let dashPlayer = null;
+<div class="main-grid">  <div>    
+<div class="player-wrapper">    
+    <div id="videoError" class="video-error-alert" style="display:none">    
+        ⚠ 動画の取得に失敗しました。別の再生方法をお試しください。    
+        <span class="close-btn" onclick="hideVideoError()">×</span>    
+    </div>  <video id="videoPlayer" controls    
+    poster="https://img.youtube.com/vi/{{ videoid }}/0.jpg">    
+</video>  </div>  <div class="video-title">{{ videotitle }}</div>  <div class="channel-row">    
+    <a href="/channel/{{authorid}}">    
+        <img src="{{authoricon}}">    
+    </a>    
+    <div>{{ author }}</div>    
+</div>  <div class="actions">    
+    <a class="action-btn primary" href="{{ videourls[0] }}" target="_blank">⬇ ダウンロード</a>    
+</div>  <div class="description">    
+{{ description | safe }}  <div class="option-box">    
+    <select id="qualitySelect">    
+        <option value="0">高画質</option>    
+        <option value="1">低画質</option>    
+    </select>    
+</div>    
+</div>  <div class="option-box">    
+    <button onclick="setMode('nocookie')">nocookie再生</button>    
+    <button onclick="setMode('stream')">stream再生</button>  <select id="backendSelect">    
+    <option value="main">main</option>    
+    <option value="yobi">yobi</option>    
+    <option value="yobiyobi">yobiyobi</option>    
+</select>  </div>  <div style="margin-top:24px">    
+    <iframe src="/comments?v={{ videoid }}"    
+        style="width:100%;border:none;min-height:600px">    
+    </iframe>    
+</div>    
+</div>  <div class="related">    
+{% for re in res %}    
+<a href="/watch?v={{ re['id'] }}" class="related-item">    
+    <div class="related-thumb">    
+        <img src="https://img.youtube.com/vi/{{ re['id'] }}/0.jpg">    
+    </div>    
+    <div>    
+        <div>{{ re["title"] }}</div>    
+        <div style="font-size:12px;color:#64748b">{{ re["author"] }}</div>    
+    </div>    
+</a>    
+{% endfor %}    
+</div>  </div>    
+</div>  <script>    
+const urls = {{ videourls | tojson }};    
+const dash = {{ dash | tojson }};    
+const video = document.getElementById("videoPlayer");    
+const backendSelect = document.getElementById("backendSelect");    
+const qualitySelect = document.getElementById("qualitySelect");    
+const errorAlert = document.getElementById("videoError");    let dashPlayer = null;
 let hlsPlayer = null;
 
 function showVideoError(){
-    errorAlert.style.display = "block";
-    errorAlert.style.animation = "none";
-    errorAlert.offsetHeight;
-    errorAlert.style.animation = null;
+errorAlert.style.display = "block";
+errorAlert.style.animation = "none";
+errorAlert.offsetHeight;
+errorAlert.style.animation = null;
 }
 
 function hideVideoError(){
-    errorAlert.style.display = "none";
+errorAlert.style.display = "none";
 }
 
 video.onerror = showVideoError;
 
 function getStreamBase(){
-    if (backendSelect.value === "yobi") return "/api/streamurl/yobi";
-    if (backendSelect.value === "yobiyobi") return "/api/streamurl/yobiyobi";
-    return "/api/streamurl";
+if (backendSelect.value === "yobi") return "/api/streamurl/yobi";
+if (backendSelect.value === "yobiyobi") return "/api/streamurl/yobiyobi";
+return "/api/streamurl";
 }
 
 video.src = urls[1] || urls[0];
-</script>
-
-<!-- ===================== ここから追記（既存コードは一切変更なし） ===================== -->
-<script>
+</script>  <!-- ===================== ここから追記（既存コードは一切変更なし） ===================== -->  <script>
 const originalVideoHTML = document.querySelector(".player-wrapper").innerHTML;
 
 function updatePlayer(){
-    const backend = backendSelect.value;
-    const wrapper = document.querySelector(".player-wrapper");
+const backend = backendSelect.value;
+const wrapper = document.querySelector(".player-wrapper");
 
-    if(backend === "yobiyobi"){
-        const iframe = document.createElement("iframe");
-        const url = `/emobedhigh.html?video_id={{ videoid }}&backend=yobiyobi`;
-        iframe.src = url;
-        iframe.width = "100%";
-        iframe.height = "480";
-        iframe.style.border = "none";
+if(backend === "yobiyobi"){
+    const iframe = document.createElement("iframe");
+    iframe.src = urls[1] || urls[0];
 
-        wrapper.innerHTML = "";
-        wrapper.appendChild(iframe);
-    } else {
-        wrapper.innerHTML = originalVideoHTML;
-        const video = document.getElementById("videoPlayer");
-        if(video){
-            video.src = urls[1] || urls[0];
-            video.onerror = showVideoError;
-        }
+    wrapper.innerHTML = "";
+    wrapper.appendChild(iframe);
+} else {
+    wrapper.innerHTML = originalVideoHTML;
+    const video = document.getElementById("videoPlayer");
+    if(video){
+        video.src = urls[1] || urls[0];
+        video.onerror = showVideoError;
     }
 }
 
+}
+
 backendSelect.addEventListener("change", () => {
-    updatePlayer();
+updatePlayer();
 });
 
 updatePlayer();
-</script>
-<!-- ===================== 追記ここまで ===================== -->
+</script>  <!-- ===================== 追記ここまで ===================== -->  </body>
 
-</body>
 </html>
