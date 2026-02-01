@@ -316,5 +316,17 @@
     noticeModal.onclick = e => { if (e.target === noticeModal) closeModal(noticeModal); }
 </script>
 
+<script>
+$(function () {
+    $('#searchbox').autocomplete({
+        source: function (request, response) {
+            $.getJSON("/suggest", { keyword: request.term }, response);
+        },
+        delay: 300,
+        minLength: 1
+    });
+});
+</script>
+
 </body>
 </html>
