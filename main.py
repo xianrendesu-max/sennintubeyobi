@@ -9,7 +9,7 @@ import base64
 from cache import cache
 
 from fastapi import FastAPI, Request, Response, Cookie, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, Response as RawResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response as RawResponse, PlainTextResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from typing import Union
 import httpx
 from bs4 import BeautifulSoup
+import traceback
 
 # =========================
 # 基本設定
@@ -73,8 +74,7 @@ class APItimeoutError(Exception):
 def check_cookie(cookie: Union[str, None]) -> bool:
     return cookie == "True"
 
-# 共通 AsyncClient を再利用（接続プールで最大活用）
-http_client = httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}, timeout=max_api_wait_time)
+http_client = None
 
 # =========================
 # 並列API最速勝ち
@@ -84,25 +84,28 @@ async def fetch_api(api, url):
     try:
         r = await http_client.get(api + url)
         r.raise_for_status()
-        return api, r.json()
+        try:
+            return api, r.json()
+        except:
+            return None
     except:
         return None
 
 async def api_request_core(api_list, url):
     tasks = [fetch_api(api, url) for api in api_list]
-    for fut in asyncio.as_completed(tasks, timeout=max_time):
-        try:
+    try:
+        for fut in asyncio.as_completed(tasks):
             result = await fut
-        except asyncio.TimeoutError:
-            continue
-        if not result:
-            continue
-        api, data = result
-        if api in api_list:
-            api_list.remove(api)
-            api_list.insert(0, api)
-        return data
-    raise APItimeoutError("API timeout")
+            if not result:
+                continue
+            api, data = result
+            if api in api_list:
+                api_list.remove(api)
+                api_list.insert(0, api)
+            return data
+    except:
+        pass
+    return {}
 
 async def apirequest(url):
     return await api_request_core(apis, url)
@@ -198,13 +201,13 @@ async def get_data(videoid):
 
     return (
         [{"id": i["videoId"], "title": i["title"], "author": i["author"], "authorId": i["authorId"]}
-         for i in t["recommendedVideos"]],
+         for i in t.get("recommendedVideos", [])],
         videourls,
-        t["descriptionHtml"].replace("\n", "<br>"),
-        t["title"],
-        t["authorId"],
-        t["author"],
-        t["authorThumbnails"][-1]["url"],
+        t.get("descriptionHtml", "").replace("\n", "<br>"),
+        t.get("title"),
+        t.get("authorId"),
+        t.get("author"),
+        t.get("authorThumbnails", [{}])[-1].get("url", ""),
         nocookie_url,
         hls_url,
         dash,
@@ -233,11 +236,11 @@ async def get_channel(channelid):
         videos,
         shorts,
         {
-            "channelname": t["author"],
-            "channelicon": t["authorThumbnails"][-1]["url"],
+            "channelname": t.get("author"),
+            "channelicon": t.get("authorThumbnails", [{}])[-1].get("url", ""),
             "channelprofile": t.get("description", ""),
             "subscribers_count": t.get("subCountText"),
-            "cover_img_url": t["authorBanners"][-1]["url"] if t.get("authorBanners") else None
+            "cover_img_url": t.get("authorBanners", [{}])[-1].get("url") if t.get("authorBanners") else None
         }
     )
 
@@ -268,15 +271,37 @@ async def get_comments(videoid):
     t = await apicommentsrequest("api/v1/comments/" + urllib.parse.quote(videoid) + "?hl=jp")
     return [{
         "author": i["author"],
-        "authoricon": i["authorThumbnails"][-1]["url"],
+        "authoricon": i.get("authorThumbnails", [{}])[-1].get("url", ""),
         "body": i["contentHtml"].replace("\n", "<br>")
-    } for i in t["comments"]]
+    } for i in t.get("comments", [])]
 
 # =========================
 # FastAPI
 # =========================
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+@app.on_event("startup")
+async def startup():
+    global http_client
+    http_client = httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}, timeout=max_api_wait_time)
+
+@app.on_event("shutdown")
+async def shutdown():
+    await http_client.aclose()
+
+@app.middleware("http")
+async def suppress_500(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        traceback.print_exc()
+        return PlainTextResponse("Error suppressed", status_code=200)
+
+@app.exception_handler(Exception)
+async def all_exception_handler(request: Request, exc: Exception):
+    traceback.print_exc()
+    return PlainTextResponse("Internal Server Error (handled)", status_code=200)
 
 app.mount("/css", StaticFiles(directory="./css"), name="css")
 app.mount("/word", StaticFiles(directory="./blog", html=True), name="word")
