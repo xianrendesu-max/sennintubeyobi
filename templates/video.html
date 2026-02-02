@@ -353,8 +353,8 @@ function updatePlayer(){
         v.poster = "https://img.youtube.com/vi/{{ videoid }}/0.jpg";
         v.style.width = "100%";
         v.onerror = showVideoError;
-        v.src = "/api/stream/mux?video_id={{ videoid }}";
         wrapper.appendChild(v);
+        playWkt(v);
         return;
     } else {
         wrapper.innerHTML = originalVideoHTML;
