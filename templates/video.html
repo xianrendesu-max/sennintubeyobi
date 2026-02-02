@@ -282,7 +282,6 @@ function getStreamBase(){
 video.src = urls[1] || urls[0];
 </script>
 
-<!-- ===================== ここから追記（既存コードは一切変更なし） ===================== -->
 <script>
 const originalVideoHTML = document.querySelector(".player-wrapper").innerHTML;
 
@@ -348,15 +347,15 @@ function updatePlayer(){
     }
 
     if(backend === "yobiyobi"){
-        const iframe = document.createElement("iframe");
-        const url = `/emobedhigh.html?video_id={{ videoid }}&backend=yobiyobi`;
-        iframe.src = url;
-        iframe.width = "100%";
-        iframe.height = "480";
-        iframe.style.border = "none";
-
         wrapper.innerHTML = "";
-        wrapper.appendChild(iframe);
+        const v = document.createElement("video");
+        v.controls = true;
+        v.poster = "https://img.youtube.com/vi/{{ videoid }}/0.jpg";
+        v.style.width = "100%";
+        v.onerror = showVideoError;
+        v.src = "/api/stream/mux?video_id={{ videoid }}";
+        wrapper.appendChild(v);
+        return;
     } else {
         wrapper.innerHTML = originalVideoHTML;
         const video = document.getElementById("videoPlayer");
@@ -395,7 +394,6 @@ function setMode(mode){
     }
 }
 </script>
-<!-- ===================== 追記ここまで ===================== -->
 
 </body>
 </html>
