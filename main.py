@@ -9,7 +9,7 @@ import base64
 from cache import cache
 
 from fastapi import FastAPI, Request, Response, Cookie, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, Response as RawResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response as RawResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,7 +17,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from typing import Union
 import httpx
 from bs4 import BeautifulSoup
-import traceback
 
 # =========================
 # 基本設定
@@ -54,12 +53,6 @@ if os.path.exists("./senninverify"):
     except:
         pass
 
-X_INSTANCES = [
-    "https://nitter.net",
-    "https://xcancel.com",
-    "https://nuku.trabun.org",
-]
-
 # =========================
 # 例外
 # =========================
@@ -74,38 +67,43 @@ class APItimeoutError(Exception):
 def check_cookie(cookie: Union[str, None]) -> bool:
     return cookie == "True"
 
-http_client = None
-
 # =========================
 # 並列API最速勝ち
 # =========================
 
-async def fetch_api(api, url):
-    try:
-        r = await http_client.get(api + url)
-        r.raise_for_status()
+async def api_request_core(api_list, url):
+    start = time.time()
+    lock = asyncio.Lock()
+
+    async def fetch(client, api):
         try:
-            return api, r.json()
+            r = await client.get(api + url, timeout=max_api_wait_time)
+            r.raise_for_status()
+            return api, r.text
         except:
             return None
-    except:
-        return None
 
-async def api_request_core(api_list, url):
-    tasks = [fetch_api(api, url) for api in api_list]
-    try:
-        for fut in asyncio.as_completed(tasks):
-            result = await fut
+    async with httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}) as client:
+        tasks = [fetch(client, api) for api in api_list[:8]]
+        for fut in asyncio.as_completed(tasks, timeout=max_time):
+            try:
+                result = await fut
+            except asyncio.TimeoutError:
+                continue
             if not result:
                 continue
-            api, data = result
-            if api in api_list:
-                api_list.remove(api)
-                api_list.insert(0, api)
-            return data
-    except:
-        pass
-    return {}
+            api, text = result
+            try:
+                json.loads(text)
+            except:
+                continue
+            async with lock:
+                if api in api_list:
+                    api_list.remove(api)
+                    api_list.insert(0, api)
+            return text
+
+    raise APItimeoutError("API timeout")
 
 async def apirequest(url):
     return await api_request_core(apis, url)
@@ -122,7 +120,10 @@ async def apicommentsrequest(url):
 
 @cache(seconds=30)
 async def get_search(q, page):
-    data = await apirequest(f"api/v1/search?q={urllib.parse.quote(q)}&page={page}&hl=jp")
+    data = json.loads(
+        await apirequest(f"api/v1/search?q={urllib.parse.quote(q)}&page={page}&hl=jp")
+    )
+
     results = []
     for i in data:
         t = i.get("type")
@@ -160,13 +161,14 @@ async def get_search(q, page):
 # =========================
 
 async def get_data(videoid):
-    t = await apirequest("api/v1/videos/" + urllib.parse.quote(videoid))
+    t = json.loads(await apirequest("api/v1/videos/" + urllib.parse.quote(videoid)))
 
     videourls = [i["url"] for i in t.get("formatStreams", [])]
     hls_url = t.get("hlsUrl")
     nocookie_url = f"https://www.youtube-nocookie.com/embed/{videoid}"
 
     adaptive = t.get("adaptiveFormats", [])
+
     audio = None
     videos = {}
 
@@ -201,13 +203,13 @@ async def get_data(videoid):
 
     return (
         [{"id": i["videoId"], "title": i["title"], "author": i["author"], "authorId": i["authorId"]}
-         for i in t.get("recommendedVideos", [])],
+         for i in t["recommendedVideos"]],
         videourls,
-        t.get("descriptionHtml", "").replace("\n", "<br>"),
-        t.get("title"),
-        t.get("authorId"),
-        t.get("author"),
-        t.get("authorThumbnails", [{}])[-1].get("url", ""),
+        t["descriptionHtml"].replace("\n", "<br>"),
+        t["title"],
+        t["authorId"],
+        t["author"],
+        t["authorThumbnails"][-1]["url"],
         nocookie_url,
         hls_url,
         dash,
@@ -219,7 +221,7 @@ async def get_data(videoid):
 # =========================
 
 async def get_channel(channelid):
-    t = await apichannelrequest("api/v1/channels/" + urllib.parse.quote(channelid))
+    t = json.loads(await apichannelrequest("api/v1/channels/" + urllib.parse.quote(channelid)))
 
     videos = []
     shorts = []
@@ -236,11 +238,11 @@ async def get_channel(channelid):
         videos,
         shorts,
         {
-            "channelname": t.get("author"),
-            "channelicon": t.get("authorThumbnails", [{}])[-1].get("url", ""),
+            "channelname": t["author"],
+            "channelicon": t["authorThumbnails"][-1]["url"],
             "channelprofile": t.get("description", ""),
             "subscribers_count": t.get("subCountText"),
-            "cover_img_url": t.get("authorBanners", [{}])[-1].get("url") if t.get("authorBanners") else None
+            "cover_img_url": t["authorBanners"][-1]["url"] if t.get("authorBanners") else None
         }
     )
 
@@ -250,7 +252,7 @@ async def get_channel(channelid):
 
 @cache(seconds=30)
 async def get_home():
-    data = await apirequest("api/v1/popular?hl=jp")
+    data = json.loads(await apirequest("api/v1/popular?hl=jp"))
 
     videos = []
     shorts = []
@@ -268,40 +270,18 @@ async def get_home():
     return videos, shorts, channels
 
 async def get_comments(videoid):
-    t = await apicommentsrequest("api/v1/comments/" + urllib.parse.quote(videoid) + "?hl=jp")
+    t = json.loads(await apicommentsrequest("api/v1/comments/" + urllib.parse.quote(videoid) + "?hl=jp"))
     return [{
         "author": i["author"],
-        "authoricon": i.get("authorThumbnails", [{}])[-1].get("url", ""),
+        "authoricon": i["authorThumbnails"][-1]["url"],
         "body": i["contentHtml"].replace("\n", "<br>")
-    } for i in t.get("comments", [])]
+    } for i in t["comments"]]
 
 # =========================
 # FastAPI
 # =========================
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-
-@app.on_event("startup")
-async def startup():
-    global http_client
-    http_client = httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}, timeout=max_api_wait_time)
-
-@app.on_event("shutdown")
-async def shutdown():
-    await http_client.aclose()
-
-@app.middleware("http")
-async def suppress_500(request: Request, call_next):
-    try:
-        return await call_next(request)
-    except Exception:
-        traceback.print_exc()
-        return PlainTextResponse("Error suppressed", status_code=200)
-
-@app.exception_handler(Exception)
-async def all_exception_handler(request: Request, exc: Exception):
-    traceback.print_exc()
-    return PlainTextResponse("Internal Server Error (handled)", status_code=200)
 
 app.mount("/css", StaticFiles(directory="./css"), name="css")
 app.mount("/word", StaticFiles(directory="./blog", html=True), name="word")
@@ -318,14 +298,20 @@ M3U8_API   = "https://ytdl-0et1.onrender.com/m3u8/"
 
 @app.get("/stream/high")
 async def stream_high(v: str):
-    for api in [M3U8_API, STREAM_API]:
-        try:
-            return RedirectResponse(f"{api}{v}")
-        except:
-            continue
-    t = await apirequest("api/v1/videos/" + urllib.parse.quote(v))
+    try:
+        return RedirectResponse(f"{M3U8_API}{v}")
+    except:
+        pass
+
+    try:
+        return RedirectResponse(f"{STREAM_API}{v}")
+    except:
+        pass
+
+    t = json.loads(await apirequest("api/v1/videos/" + urllib.parse.quote(v)))
     if t.get("hlsUrl"):
         return RedirectResponse(t["hlsUrl"])
+
     raise HTTPException(status_code=503, detail="High quality stream unavailable")
 
 # =========================
@@ -447,7 +433,8 @@ async def comments(request: Request, v: str):
 
 @app.get("/thumbnail")
 async def thumbnail(v: str):
-    r = await http_client.get(f"https://img.youtube.com/vi/{v}/0.jpg")
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"https://img.youtube.com/vi/{v}/0.jpg")
     return RawResponse(
         content=r.content,
         media_type="image/jpeg"
@@ -457,18 +444,21 @@ async def thumbnail(v: str):
 # ★★★ X (Nitter系) 統合・完全 async ★★★
 # ============================================================
 
+X_INSTANCES = [
+    "https://nitter.net",
+    "https://xcancel.com",
+    "https://nuku.trabun.org",
+]
+
 async def x_fetch(path: str):
-    tasks = [http_client.get(base + path, follow_redirects=True) for base in X_INSTANCES]
-    done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-    for fut in done:
-        try:
-            r = fut.result()
-            r.raise_for_status()
-            for base in X_INSTANCES:
-                if r.url.host in base:
-                    return r.text, base
-        except:
-            continue
+    async with httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}, timeout=max_api_wait_time) as client:
+        for base in X_INSTANCES:
+            try:
+                r = await client.get(base + path, follow_redirects=True)
+                r.raise_for_status()
+                return r.text, base
+            except:
+                continue
     raise APItimeoutError("X fetch failed")
 
 def encode_media_url(url: str) -> str:
@@ -544,8 +534,9 @@ async def x_media_proxy(u: str):
     if not url.startswith("https://"):
         raise HTTPException(status_code=400)
 
-    r = await http_client.get(url)
-    r.raise_for_status()
+    async with httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}, timeout=5) as client:
+        r = await client.get(url)
+        r.raise_for_status()
 
     return Response(
         content=r.content,
