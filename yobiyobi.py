@@ -84,9 +84,12 @@ def select_best_video_audio(formats, safari=False):
     if not videos or not audios:
         return None, None
 
+    h264 = [v for v in videos if is_h264(v)]
     if safari:
-        h264 = [v for v in videos if is_h264(v)]
         videos = h264 or videos
+    else:
+        if h264:
+            videos = h264
 
     videos.sort(key=video_score, reverse=True)
     best_video = videos[0]
@@ -95,9 +98,12 @@ def select_best_video_audio(formats, safari=False):
     non_en = [a for a in audios if "en" not in (a.get("language") or "").lower()]
     target = jp or non_en or audios
 
+    aac = [a for a in target if is_aac(a)]
     if safari:
-        aac = [a for a in target if is_aac(a)]
         target = aac or target
+    else:
+        if aac:
+            target = aac
 
     target.sort(key=audio_score, reverse=True)
     best_audio = target[0]
@@ -140,6 +146,7 @@ def api_stream_mux(request: Request, video_id: str, safari: bool = False):
         uid = uuid.uuid4().hex
         out_path = os.path.join(TMP_DIR, f"{uid}.mp4")
 
+        use_copy = is_h264(video) and is_aac(audio)
         cmd = [
             "ffmpeg",
             "-y",
@@ -148,9 +155,26 @@ def api_stream_mux(request: Request, video_id: str, safari: bool = False):
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "5",
             "-i", video["url"],
+            "-headers", "User-Agent: Mozilla/5.0\r\n",
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "5",
             "-i", audio["url"],
-            "-c:v", "copy",
-            "-c:a", "copy",
+        ]
+
+        if use_copy:
+            cmd += [
+                "-c:v", "copy",
+                "-c:a", "copy",
+            ]
+        else:
+            cmd += [
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-c:a", "aac",
+            ]
+
+        cmd += [
             "-movflags", "+faststart",
             out_path,
         ]
