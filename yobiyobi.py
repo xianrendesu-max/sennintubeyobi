@@ -1,11 +1,37 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-import requests, random, time
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+import requests
+import random
+import os
+import subprocess
+import uuid
 
 app = FastAPI()
 
 # ===============================
-# CONFIG
+# Static
+# ===============================
+# Render で statics が無くても即死しないようにする
+if os.path.isdir("statics"):
+    app.mount("/static", StaticFiles(directory="statics"), name="static")
+
+    # ★ 仙人music
+    if os.path.isdir("statics/music"):
+        app.mount("/music", StaticFiles(directory="statics/music", html=True), name="music")
+    else:
+        print("⚠ statics/music directory not found (skipped mount)")
+else:
+    print("⚠ statics directory not found (skipped mount)")
+
+@app.get("/")
+def root():
+    if os.path.isfile("statics/index.html"):
+        return FileResponse("statics/index.html")
+    return {"status": "index.html not found"}
+
+# ===============================
+# API BASE LIST
 # ===============================
 VIDEO_APIS = [
     "https://iv.melmac.space",
@@ -15,202 +41,290 @@ VIDEO_APIS = [
     "https://yt.omada.cafe",
 ]
 
-STREAM_APIS = [
-    "https://yudlp.vercel.app/stream/",
-    "https://yt-dl-kappa.vercel.app/short/",
+SEARCH_APIS = VIDEO_APIS
+
+COMMENTS_APIS = [
+    "https://invidious.lunivers.trade",
+    "https://invidious.ducks.party",
+    "https://super8.absturztau.be",
+    "https://invidious.nikkosphere.com",
+    "https://yt.omada.cafe",
+    "https://iv.melmac.space",
+    "https://iv.duti.dev",
 ]
 
-HEADERS = {"User-Agent": "Mozilla/5.0"}
+EDU_STREAM_API_BASE_URL = "https://raw.githubusercontent.com/toka-kun/Education/refs/heads/main/keys/key1.json"
+STREAM_YTDL_API_BASE_URL = "https://yudlp.vercel.app/stream/"
+SHORT_STREAM_API_BASE_URL = "https://yt-dl-kappa.vercel.app/short/"
+
 TIMEOUT = 6
 
-# ===============================
-# CACHE / BLACKLIST
-# ===============================
-SUCCESS_CACHE = {}        # video_id -> api
-FAIL_CACHE = {}           # api -> expire
-FAIL_TTL = 300            # sec
-
-def blacklisted(api):
-    return FAIL_CACHE.get(api, 0) > time.time()
-
-def mark_fail(api):
-    FAIL_CACHE[api] = time.time() + FAIL_TTL
-
-def mark_success(video_id, api):
-    SUCCESS_CACHE[video_id] = api
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
 
 # ===============================
-# UTILS
+# Utils
 # ===============================
-def try_json(url):
+def try_json(url, params=None):
     try:
-        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        r = requests.get(url, params=params, headers=HEADERS, timeout=TIMEOUT)
         if r.status_code == 200:
             return r.json()
-    except:
-        pass
+    except Exception as e:
+        print("request error:", e)
     return None
 
-def is_video(f): return str(f.get("type","")).startswith("video")
-def is_audio(f): return str(f.get("type","")).startswith("audio")
+# ===============================
+# Search
+# ===============================
+@app.get("/api/search")
+def api_search(q: str):
+    results = []
+    random.shuffle(SEARCH_APIS)
 
-# ===============================
-# STREAM URL DIRECT
-# ===============================
-def try_direct(video_id):
-    for base in STREAM_APIS:
-        if blacklisted(base):
+    for base in SEARCH_APIS:
+        data = try_json(f"{base}/api/v1/search", {"q": q, "type": "video"})
+        if not isinstance(data, list):
             continue
-        data = try_json(base + video_id)
-        if data and data.get("url"):
-            mark_success(video_id, base)
-            return data["url"]
-        mark_fail(base)
-    return None
+
+        for v in data:
+            if not v.get("videoId"):
+                continue
+
+            results.append({
+                "videoId": v.get("videoId"),
+                "title": v.get("title"),
+                "author": v.get("author"),
+                "authorId": v.get("authorId"),
+            })
+
+        if results:
+            return {
+                "count": len(results),
+                "results": results,
+                "source": base
+            }
+
+    raise HTTPException(status_code=503, detail="Search unavailable")
 
 # ===============================
-# MSE API
+# Video Info
 # ===============================
-@app.get("/api/mse")
-def api_mse(video_id: str):
-    direct = try_direct(video_id)
-    if direct:
-        return {"mode": "direct", "url": direct}
-
+@app.get("/api/video")
+def api_video(video_id: str):
     random.shuffle(VIDEO_APIS)
 
     for base in VIDEO_APIS:
-        if blacklisted(base):
-            continue
-
         data = try_json(f"{base}/api/v1/videos/{video_id}")
-        if not data:
-            mark_fail(base)
+        if data:
+            return {
+                "title": data.get("title"),
+                "author": data.get("author"),
+                "description": data.get("description"),
+                "viewCount": data.get("viewCount"),
+                "lengthSeconds": data.get("lengthSeconds"),
+                "source": base
+            }
+
+    raise HTTPException(status_code=503, detail="Video info unavailable")
+
+# ===============================
+# Comments
+# ===============================
+@app.get("/api/comments")
+def api_comments(video_id: str):
+    for base in COMMENTS_APIS:
+        data = try_json(f"{base}/api/v1/comments/{video_id}")
+        if data:
+            return {
+                "comments": [
+                    {
+                        "author": c.get("author"),
+                        "content": c.get("content")
+                    }
+                    for c in data.get("comments", [])
+                ],
+                "source": base
+            }
+    return {"comments": [], "source": None}
+
+# ===============================
+# Channel（完全版・修整済）
+# ===============================
+@app.get("/api/channel")
+def api_channel(c: str):
+    random.shuffle(VIDEO_APIS)
+
+    for base in VIDEO_APIS:
+        ch = try_json(f"{base}/api/v1/channels/{c}")
+        if not ch:
             continue
 
-        fmts = data.get("adaptiveFormats", [])
-        videos = [f for f in fmts if is_video(f)]
-        audios = [f for f in fmts if is_audio(f)]
+        latest_videos = []
 
-        if not videos or not audios:
-            mark_fail(base)
-            continue
+        for v in ch.get("latestVideos", []):
+            published_raw = v.get("published")
+            published_iso = None
 
-        videos.sort(key=lambda x:(x.get("height",0),x.get("fps",0)), reverse=True)
-        audios.sort(key=lambda x:x.get("bitrate",0), reverse=True)
+            if isinstance(published_raw, str):
+                try:
+                    published_iso = published_raw.replace("Z", "+00:00")
+                except:
+                    published_iso = None
 
-        mark_success(video_id, base)
+            latest_videos.append({
+                "videoId": v.get("videoId"),
+                "title": v.get("title"),
+                "author": ch.get("author"),
+                "authorId": c,
+                "viewCount": v.get("viewCount") or 0,
+                "viewCountText": v.get("viewCountText") or "0 回視聴",
+                "published": published_iso,
+                "publishedText": v.get("publishedText") or ""
+            })
+
+        view_count = ch.get("viewCount")
+        video_count = ch.get("videoCount")
+        joined_date = ch.get("joinedDate")
+
+        if not isinstance(video_count, int):
+            video_count = len(latest_videos)
+
+        if not isinstance(joined_date, str):
+            published_dates = [
+                v["published"]
+                for v in latest_videos
+                if isinstance(v.get("published"), str)
+            ]
+            joined_date = min(published_dates) if published_dates else None
+
+        related_channels = []
+
+        for r in ch.get("relatedChannels", []):
+            icon = None
+            thumbs = r.get("authorThumbnails")
+
+            if isinstance(thumbs, list) and thumbs:
+                icon = thumbs[-1].get("url")
+
+            related_channels.append({
+                "channelId": r.get("authorId"),
+                "name": r.get("author"),
+                "icon": icon,
+                "subCountText": r.get("subCountText") or "?"
+            })
+
         return {
-            "mode": "mse",
-            "video": videos[0]["url"],
-            "audio": audios[0]["url"]
+            "author": ch.get("author"),
+            "authorId": c,
+            "authorThumbnails": ch.get("authorThumbnails"),
+            "description": ch.get("description") or "",
+            "subCount": ch.get("subCount") or 0,
+            "viewCount": view_count or 0,
+            "videoCount": video_count,
+            "joinedDate": joined_date,
+            "latestVideos": latest_videos,
+            "relatedChannels": related_channels,
+            "source": base
         }
 
-    raise HTTPException(503)
+    raise HTTPException(status_code=503, detail="Channel unavailable")
 
 # ===============================
-# ROOT HTML (PLAYER)
+# Stream URL ONLY（yobiyobi / iOS対応・映像＋音声合成）
 # ===============================
-@app.get("/", response_class=HTMLResponse)
-def index():
-    return """
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>MSE Player</title>
-<style>
-body{background:#000;color:#fff;font-family:sans-serif;text-align:center}
-video{width:90%;max-width:960px;margin-top:20px;background:#000}
-#error{color:#f55;margin-top:10px}
-button{padding:8px 16px;font-size:16px}
-</style>
-</head>
-<body>
+@app.get("/api/streamurl/yobiyobi")
+def api_streamurl_yobiyobi(video_id: str, quality: str = "best"):
+    for base in VIDEO_APIS:
+        data = try_json(f"{base}/api/v1/videos/{video_id}")
+        if not data:
+            continue
 
-<h2>MSE Player</h2>
-<input id="vid" placeholder="YouTube videoId">
-<button onclick="start()">再生</button>
+        video_url = None
+        audio_url = None
 
-<video id="v" controls></video>
-<div id="error"></div>
+        for f in data.get("adaptiveFormats", []):
+            if f.get("type", "").startswith("video") and f.get("url"):
+                if quality == "best" or quality in (f.get("qualityLabel") or ""):
+                    video_url = f["url"]
+                    break
 
-<script>
-const video = document.getElementById("v");
-const errorBox = document.getElementById("error");
-let currentId = null;
+        for f in data.get("adaptiveFormats", []):
+            if f.get("type", "").startswith("audio") and f.get("url"):
+                lang = (f.get("language") or "").lower()
+                if "en" in lang:
+                    continue
+                audio_url = f["url"]
+                break
 
-function show(msg){
-  errorBox.textContent = msg;
-}
+        if not video_url or not audio_url:
+            continue
 
-async function start(){
-  currentId = document.getElementById("vid").value.trim();
-  if(!currentId) return;
-  play(currentId);
-}
+        out = f"/tmp/{uuid.uuid4()}.mp4"
 
-async function play(id){
-  show("");
-  video.pause();
-  video.removeAttribute("src");
-  video.load();
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i", video_url,
+            "-i", audio_url,
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-c:v", "libx264",
+            "-profile:v", "main",
+            "-level", "3.1",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-ac", "2",
+            "-ar", "44100",
+            "-af", "aresample=async=1",
+            "-movflags", "+faststart",
+            out
+        ]
 
-  let res = await fetch("/api/mse?video_id="+id);
-  if(!res.ok){
-    show("取得失敗");
-    return;
-  }
-  let info = await res.json();
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-  if(info.mode === "direct"){
-    video.src = info.url;
-    video.play().catch(()=>show("再生失敗"));
-    return;
-  }
+        return RedirectResponse(out)
 
-  const ms = new MediaSource();
-  video.src = URL.createObjectURL(ms);
+    raise HTTPException(status_code=503, detail="yobiyobi stream unavailable")
 
-  ms.addEventListener("sourceopen", async ()=>{
-    const ab = ms.addSourceBuffer('audio/mp4; codecs="mp4a.40.2"');
-    const vb = ms.addSourceBuffer('video/mp4; codecs="avc1.64001f"');
+# ===============================
+# Stream URL ONLY（旧）
+# ===============================
+@app.get("/api/streamurl")
+def api_streamurl(video_id: str, quality: str = "best"):
+    for base in [
+        EDU_STREAM_API_BASE_URL,
+        STREAM_YTDL_API_BASE_URL,
+        SHORT_STREAM_API_BASE_URL
+    ]:
+        data = try_json(f"{base}{video_id}", {"quality": quality})
+        if data and data.get("url"):
+            return RedirectResponse(data["url"])
 
-    try{
-      // 🔊 audio first
-      const a = await fetch(info.audio).then(r=>r.arrayBuffer());
-      ab.appendBuffer(a);
-    }catch{
-      show("音声取得失敗");
-      return;
-    }
+    for base in VIDEO_APIS:
+        data = try_json(f"{base}/api/v1/videos/{video_id}")
+        if not data:
+            continue
 
-    ab.addEventListener("updateend", async ()=>{
-      video.play().catch(()=>{});
-      try{
-        // 🎥 video later
-        const v = await fetch(info.video).then(r=>r.arrayBuffer());
-        vb.appendBuffer(v);
-      }catch{
-        show("映像取得失敗");
-      }
+        for f in data.get("adaptiveFormats", []):
+            if not f.get("url"):
+                continue
 
-      vb.addEventListener("updateend", ()=>{
-        try{ ms.endOfStream(); }catch{}
-      }, {once:true});
-    }, {once:true});
-  });
-}
+            lang = (f.get("language") or "").lower()
+            audio_track = str(f.get("audioTrack") or "").lower()
 
-// URL 期限切れ対策
-video.onerror = ()=>{
-  show("再接続中…");
-  if(currentId){
-    setTimeout(()=>play(currentId), 1000);
-  }
-};
-</script>
+            if "en" in lang:
+                continue
+            if "english" in audio_track:
+                continue
 
-</body>
-</html>
-"""
+            label = f.get("qualityLabel") or ""
+
+            if quality == "best" or quality in label:
+                return RedirectResponse(f["url"])
+
+    raise HTTPException(status_code=503, detail="Stream unavailable")
+
+from music import router as music_router
+app.include_router(music_router)
