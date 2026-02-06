@@ -75,6 +75,49 @@ def try_json(url, params=None):
         print("request error:", e)
     return None
 
+def pick_video_audio(formats, quality="best"):
+    video_url = None
+    audio_url = None
+
+    for f in formats:
+        if f.get("type", "").startswith("video") and f.get("url"):
+            if quality == "best" or quality in (f.get("qualityLabel") or ""):
+                video_url = f["url"]
+                break
+
+    for f in formats:
+        if f.get("type", "").startswith("audio") and f.get("url"):
+            lang = (f.get("language") or "").lower()
+            if "en" in lang:
+                continue
+            audio_url = f["url"]
+            break
+
+    return video_url, audio_url
+
+def mux_video_audio_ios(video_url, audio_url):
+    out = f"/tmp/{uuid.uuid4()}.mp4"
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", video_url,
+        "-i", audio_url,
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-c:v", "libx264",
+        "-profile:v", "main",
+        "-level", "3.1",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-movflags", "+faststart",
+        out
+    ]
+
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    return out
+
 # ===============================
 # Search
 # ===============================
@@ -232,10 +275,38 @@ def api_channel(c: str):
     raise HTTPException(status_code=503, detail="Channel unavailable")
 
 # ===============================
-# Stream URL ONLY（yobiyobi / iOS対応・映像＋音声合成）
+# Stream（iOS対応・映像＋音声合成）
 # ===============================
-@app.get("/api/streamurl/yobiyobi")
-def api_streamurl_yobiyobi(video_id: str, quality: str = "best"):
+@app.get("/api/stream")
+def api_stream(video_id: str, quality: str = "best"):
+    for base in VIDEO_APIS:
+        data = try_json(f"{base}/api/v1/videos/{video_id}")
+        if not data:
+            continue
+
+        video_url, audio_url = pick_video_audio(
+            data.get("adaptiveFormats", []),
+            quality
+        )
+
+        if not video_url or not audio_url:
+            continue
+
+        output = mux_video_audio_ios(video_url, audio_url)
+
+        return FileResponse(
+            output,
+            media_type="video/mp4",
+            filename=f"{video_id}.mp4"
+        )
+
+    raise HTTPException(status_code=503, detail="Stream unavailable")
+
+# ===============================
+# Stream URL ONLY（JSON）
+# ===============================
+@app.get("/api/streamurl")
+def api_streamurl(video_id: str, quality: str = "best"):
     for base in VIDEO_APIS:
         data = try_json(f"{base}/api/v1/videos/{video_id}")
         if not data:
@@ -246,62 +317,36 @@ def api_streamurl_yobiyobi(video_id: str, quality: str = "best"):
 
         for f in data.get("adaptiveFormats", []):
             if f.get("type", "").startswith("video") and f.get("url"):
-                if quality == "best" or quality in (f.get("qualityLabel") or ""):
+                label = f.get("qualityLabel") or ""
+                if quality == "best" or quality in label:
                     video_url = f["url"]
                     break
 
         for f in data.get("adaptiveFormats", []):
             if f.get("type", "").startswith("audio") and f.get("url"):
                 lang = (f.get("language") or "").lower()
+                audio_track = str(f.get("audioTrack") or "").lower()
                 if "en" in lang:
+                    continue
+                if "english" in audio_track:
                     continue
                 audio_url = f["url"]
                 break
 
-        if not video_url or not audio_url:
-            continue
+        if video_url and audio_url:
+            return {
+                "video": video_url,
+                "audio": audio_url,
+                "source": base
+            }
 
-        out = f"/tmp/{uuid.uuid4()}.mp4"
-
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-i", video_url,
-            "-i", audio_url,
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-c:v", "libx264",
-            "-profile:v", "main",
-            "-level", "3.1",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
-            "-ac", "2",
-            "-ar", "44100",
-            "-af", "aresample=async=1",
-            "-movflags", "+faststart",
-            out
-        ]
-
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        return RedirectResponse(out)
-
-    raise HTTPException(status_code=503, detail="yobiyobi stream unavailable")
+    raise HTTPException(status_code=503, detail="Stream unavailable")
 
 # ===============================
-# Stream URL ONLY（旧）
+# Stream URL ONLY（yobiyobi・旧方式）
 # ===============================
-@app.get("/api/streamurl")
-def api_streamurl(video_id: str, quality: str = "best"):
-    for base in [
-        EDU_STREAM_API_BASE_URL,
-        STREAM_YTDL_API_BASE_URL,
-        SHORT_STREAM_API_BASE_URL
-    ]:
-        data = try_json(f"{base}{video_id}", {"quality": quality})
-        if data and data.get("url"):
-            return RedirectResponse(data["url"])
-
+@app.get("/api/streamurl/yobiyobi")
+def api_streamurl_yobiyobi(video_id: str, quality: str = "best"):
     for base in VIDEO_APIS:
         data = try_json(f"{base}/api/v1/videos/{video_id}")
         if not data:
@@ -311,6 +356,7 @@ def api_streamurl(video_id: str, quality: str = "best"):
             if not f.get("url"):
                 continue
 
+            label = f.get("qualityLabel") or ""
             lang = (f.get("language") or "").lower()
             audio_track = str(f.get("audioTrack") or "").lower()
 
@@ -318,8 +364,6 @@ def api_streamurl(video_id: str, quality: str = "best"):
                 continue
             if "english" in audio_track:
                 continue
-
-            label = f.get("qualityLabel") or ""
 
             if quality == "best" or quality in label:
                 return RedirectResponse(f["url"])
