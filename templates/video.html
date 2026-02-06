@@ -387,9 +387,19 @@ function retryVideo(){
 }
 </script>
 
-<!-- ★ 追記：yobiyobi 実再生対応（既存コード変更なし） -->
+<!-- ★ yobiyobi 選択時は従来再生＋nocookie可 -->
 <script>
 function applyStream(){
+    if(backendSelect.value === "yobiyobi"){
+        hideVideoError();
+        showLoading();
+        video.pause();
+        video.src = urls[1] || urls[0];
+        video.load();
+        watchPlayback(video);
+        return;
+    }
+
     const base = getStreamBase();
     const q = qualitySelect.value === "0" ? "best" : "low";
     const url = base + "?video_id={{ videoid }}&quality=" + q;
