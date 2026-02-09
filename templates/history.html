@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>視聴履歴 - 仙人tube</title>
+
+<link rel="stylesheet" href="/css/pure-min.css">
+<link rel="stylesheet" href="/css/grids-responsive-min.css">
+<link rel="stylesheet" href="/css/default.css">
+
+<style>
+    body {
+        margin: 0;
+        background: #f9fafb;
+        font-family: "Segoe UI","Hiragino Kaku Gothic ProN",sans-serif;
+        color: #0f172a;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    h1 {
+        font-size: 24px;
+        margin-bottom: 16px;
+    }
+
+    .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .clear-btn {
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid #d1d5db;
+        background: white;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .clear-btn:hover {
+        background: #fee2e2;
+        border-color: #ef4444;
+        color: #b91c1c;
+    }
+
+    .history-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 16px;
+    }
+
+    .history-item {
+        display: flex;
+        gap: 12px;
+        background: white;
+        border-radius: 14px;
+        padding: 12px;
+        box-shadow: 0 8px 22px rgba(0,0,0,.08);
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+
+    .history-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 30px rgba(0,0,0,.15);
+    }
+
+    .thumb {
+        width: 160px;
+        aspect-ratio: 16 / 9;
+        border-radius: 10px;
+        overflow: hidden;
+        flex-shrink: 0;
+        background: #000;
+    }
+
+    .thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .info {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .title {
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.4;
+    }
+
+    .author {
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .time {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    .empty {
+        margin-top: 40px;
+        text-align: center;
+        color: #64748b;
+        font-size: 15px;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="top-bar">
+        <h1>📜 視聴履歴</h1>
+        <button class="clear-btn" onclick="clearHistory()">履歴をすべて削除</button>
+    </div>
+
+    <div id="history" class="history-list"></div>
+
+    <div id="empty" class="empty" style="display:none">
+        視聴履歴はありません
+    </div>
+
+</div>
+
+<script>
+const KEY = "watch_history";
+const historyBox = document.getElementById("history");
+const emptyBox = document.getElementById("empty");
+
+function formatTime(ts){
+    const d = new Date(ts);
+    return d.getFullYear() + "/" +
+        String(d.getMonth()+1).padStart(2,"0") + "/" +
+        String(d.getDate()).padStart(2,"0") + " " +
+        String(d.getHours()).padStart(2,"0") + ":" +
+        String(d.getMinutes()).padStart(2,"0");
+}
+
+function render(){
+    historyBox.innerHTML = "";
+
+    let list = [];
+    try {
+        list = JSON.parse(localStorage.getItem(KEY)) || [];
+    } catch(e){
+        list = [];
+    }
+
+    if(list.length === 0){
+        emptyBox.style.display = "block";
+        return;
+    }
+
+    emptyBox.style.display = "none";
+
+    list.forEach(v => {
+        const a = document.createElement("a");
+        a.href = "/watch?v=" + v.id;
+        a.className = "history-item";
+
+        a.innerHTML = `
+            <div class="thumb">
+                <img src="${v.thumb}">
+            </div>
+            <div class="info">
+                <div class="title">${v.title}</div>
+                <div class="author">${v.author}</div>
+                <div class="time">${formatTime(v.time)}</div>
+            </div>
+        `;
+
+        historyBox.appendChild(a);
+    });
+}
+
+function clearHistory(){
+    if(confirm("視聴履歴をすべて削除しますか？")){
+        localStorage.removeItem(KEY);
+        render();
+    }
+}
+
+render();
+</script>
+
+</body>
+</html>
