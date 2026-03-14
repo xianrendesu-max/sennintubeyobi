@@ -6,15 +6,18 @@ import os
 import asyncio
 import base64
 
-from cache import cache
+# cache.py が同ディレクトリに存在することを前提としています
+try:
+    from cache import cache
+except ImportError:
+    # キャッシュデコレータのスタブ（cache.pyがない場合用）
+    def cache(seconds=30):
+        def decorator(f):
+            return f
+        return decorator
 
-from fastapi import FastAPI, Request, Response, Cookie, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, Response as RawResponse
-from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from typing import Union
+from flask import Flask, request, response, render_template, redirect, make_response, send_from_directory, abort, Response as FlaskResponse
+from flask_compress import Compress
 import httpx
 from bs4 import BeautifulSoup
 
@@ -64,8 +67,12 @@ class APItimeoutError(Exception):
 # 共通
 # =========================
 
-def check_cookie(cookie: Union[str, None]) -> bool:
-    return cookie == "True"
+def check_cookie(cookie_value) -> bool:
+    return cookie_value == "True"
+
+def run_async(coro):
+    """Flask(同期)からasync関数を呼び出すためのヘルパー"""
+    return asyncio.run(coro)
 
 # =========================
 # 並列API最速勝ち
@@ -85,6 +92,7 @@ async def api_request_core(api_list, url):
 
     async with httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}) as client:
         tasks = [fetch(client, api) for api in api_list[:8]]
+        # asyncio.as_completed をそのまま利用
         for fut in asyncio.as_completed(tasks, timeout=max_time):
             try:
                 result = await fut
@@ -278,16 +286,21 @@ async def get_comments(videoid):
     } for i in t["comments"]]
 
 # =========================
-# FastAPI
+# Flask Setup
 # =========================
 
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app = Flask(__name__, static_folder=None)
+Compress(app)
 
-app.mount("/css", StaticFiles(directory="./css"), name="css")
-app.mount("/word", StaticFiles(directory="./blog", html=True), name="word")
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+# 静的ファイル設定 (FastAPIのmountの代替)
+@app.route('/css/<path:filename>')
+def custom_static_css(filename):
+    return send_from_directory('./css', filename)
 
-templates = Jinja2Templates(directory="templates")
+@app.route('/word/')
+@app.route('/word/<path:filename>')
+def custom_static_word(filename="index.html"):
+    return send_from_directory('./blog', filename)
 
 # =========================
 # 高画質ストリーム
@@ -296,89 +309,91 @@ templates = Jinja2Templates(directory="templates")
 STREAM_API = "https://ytdl-0et1.onrender.com/stream/"
 M3U8_API   = "https://ytdl-0et1.onrender.com/m3u8/"
 
-@app.get("/stream/high")
-async def stream_high(v: str):
+@app.route("/stream/high")
+def stream_high():
+    v = request.args.get("v")
     try:
-        return RedirectResponse(f"{M3U8_API}{v}")
+        return redirect(f"{M3U8_API}{v}")
     except:
         pass
 
     try:
-        return RedirectResponse(f"{STREAM_API}{v}")
+        return redirect(f"{STREAM_API}{v}")
     except:
         pass
 
-    t = json.loads(await apirequest("api/v1/videos/" + urllib.parse.quote(v)))
+    t_str = run_async(apirequest("api/v1/videos/" + urllib.parse.quote(v)))
+    t = json.loads(t_str)
     if t.get("hlsUrl"):
-        return RedirectResponse(t["hlsUrl"])
+        return redirect(t["hlsUrl"])
 
-    raise HTTPException(status_code=503, detail="High quality stream unavailable")
+    abort(503, description="High quality stream unavailable")
 
 # =========================
 # ルーティング
 # =========================
 
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request, response: Response, sennin: Union[str, None] = Cookie(None)):
+@app.route("/")
+def home():
+    sennin = request.cookies.get("sennin")
     if not check_cookie(sennin):
-        return RedirectResponse("/word")
+        return redirect("/word")
 
-    response.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
+    videos, shorts, channels = run_async(get_home())
 
-    videos, shorts, channels = await get_home()
-
-    return templates.TemplateResponse(
+    resp = make_response(render_template(
         "home.html",
-        {
-            "request": request,
-            "videos": videos,
-            "shorts": shorts,
-            "channels": channels,
-        }
-    )
+        videos=videos,
+        shorts=shorts,
+        channels=channels,
+    ))
+    resp.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
+    return resp
 
-@app.get("/search", response_class=HTMLResponse)
-async def search(request: Request, response: Response, q: str, page: int = 1, sennin: Union[str, None] = Cookie(None)):
+@app.route("/search")
+def search():
+    q = request.args.get("q", "")
+    page = int(request.args.get("page", 1))
+    sennin = request.cookies.get("sennin")
+    
     if not check_cookie(sennin):
-        return RedirectResponse("/")
-    response.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
-    return templates.TemplateResponse(
+        return redirect("/")
+    
+    results = run_async(get_search(q, page))
+    
+    resp = make_response(render_template(
         "search.html",
-        {
-            "request": request,
-            "results": await get_search(q, page),
-            "word": q,
-            "next": f"/search?q={q}&page={page+1}",
-        }
-    )
+        results=results,
+        word=q,
+        next=f"/search?q={q}&page={page+1}",
+    ))
+    resp.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
+    return resp
 
-@app.get("/watch", response_class=HTMLResponse)
-async def watch(request: Request, response: Response, v: str, sennin: Union[str, None] = Cookie(None)):
+@app.route("/watch")
+def watch():
+    v = request.args.get("v")
+    sennin = request.cookies.get("sennin")
+    
     if not check_cookie(sennin):
-        return RedirectResponse("/")
-    response.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
+        return redirect("/")
 
-    data = await get_data(v)
+    data = run_async(get_data(v))
     t = data[10]
 
     if t.get("isShort") is True:
-        return templates.TemplateResponse(
-            "shorts.html",
-            {
-                "request": request,
-                "videoid": v,
-                "author": t["author"],
-                "authorid": t["authorId"],
-                "authoricon": t["authorThumbnails"][-1]["url"],
-                "title": t["title"],
-                "hls_url": t.get("hlsUrl"),
-            }
-        )
-
-    return templates.TemplateResponse(
-        "video.html",
-        {
-            "request": request,
+        template = "shorts.html"
+        context = {
+            "videoid": v,
+            "author": t["author"],
+            "authorid": t["authorId"],
+            "authoricon": t["authorThumbnails"][-1]["url"],
+            "title": t["title"],
+            "hls_url": t.get("hlsUrl"),
+        }
+    else:
+        template = "video.html"
+        context = {
             "videoid": v,
             "videourls": data[1],
             "res": data[0],
@@ -391,57 +406,59 @@ async def watch(request: Request, response: Response, v: str, sennin: Union[str,
             "hls_url": data[8],
             "dash": data[9],
         }
-    )
 
-@app.get("/channel/{cid}", response_class=HTMLResponse)
-async def channel(request: Request, response: Response, cid: str, sennin: Union[str, None] = Cookie(None)):
+    resp = make_response(render_template(template, **context))
+    resp.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
+    return resp
+
+@app.route("/channel/<cid>")
+def channel(cid):
+    sennin = request.cookies.get("sennin")
     if not check_cookie(sennin):
-        return RedirectResponse("/")
-    response.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
+        return redirect("/")
 
-    videos, shorts, info = await get_channel(cid)
+    videos, shorts, info = run_async(get_channel(cid))
 
-    return templates.TemplateResponse(
+    resp = make_response(render_template(
         "channel.html",
-        {
-            "request": request,
-            "results": videos,
-            "shorts": shorts,
-            "channelname": info["channelname"],
-            "channelicon": info["channelicon"],
-            "channelprofile": info["channelprofile"],
-            "subscribers_count": info["subscribers_count"],
-            "cover_img_url": info["cover_img_url"],
-        }
-    )
+        results=videos,
+        shorts=shorts,
+        channelname=info["channelname"],
+        channelicon=info["channelicon"],
+        channelprofile=info["channelprofile"],
+        subscribers_count=info["subscribers_count"],
+        cover_img_url=info["cover_img_url"],
+    ))
+    resp.set_cookie("sennin", "True", max_age=7 * 24 * 60 * 60)
+    return resp
 
-@app.get("/subuscript", response_class=HTMLResponse)
-async def subuscript(request: Request, sennin: Union[str, None] = Cookie(None)):
+@app.route("/subuscript")
+def subuscript():
+    sennin = request.cookies.get("sennin")
     if not check_cookie(sennin):
-        return RedirectResponse("/")
-    return templates.TemplateResponse(
-        "subuscript.html",
-        {"request": request}
-    )
+        return redirect("/")
+    return render_template("subuscript.html")
 
-@app.get("/comments", response_class=HTMLResponse)
-async def comments(request: Request, v: str):
-    return templates.TemplateResponse(
-        "comments.html",
-        {"request": request, "comments": await get_comments(v)}
-    )
+@app.route("/comments")
+def comments():
+    v = request.args.get("v")
+    comment_data = run_async(get_comments(v))
+    return render_template("comments.html", comments=comment_data)
 
-@app.get("/thumbnail")
-async def thumbnail(v: str):
-    async with httpx.AsyncClient() as client:
-        r = await client.get(f"https://img.youtube.com/vi/{v}/0.jpg")
-    return RawResponse(
-        content=r.content,
-        media_type="image/jpeg"
-    )
+@app.route("/thumbnail")
+def thumbnail():
+    v = request.args.get("v")
+    
+    async def fetch_thumb():
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"https://img.youtube.com/vi/{v}/0.jpg")
+            return r.content
+            
+    content = run_async(fetch_thumb())
+    return FlaskResponse(content, mimetype="image/jpeg")
 
 # ============================================================
-# ★★★ X (Nitter系) 統合・完全 async ★★★
+# ★★★ X (Nitter系) 統合 ★★★
 # ============================================================
 
 X_INSTANCES = [
@@ -502,43 +519,52 @@ def parse_x_tweets(html: str, base: str):
 
     return tweets
 
-@app.get("/api/x/search")
+@app.route("/api/x/search")
 @cache(seconds=60)
-async def x_search_api(q: str):
-    html, base = await x_fetch("/search?f=tweets&q=" + urllib.parse.quote(q))
-    return {
-        "query": q,
-        "tweets": parse_x_tweets(html, base)
-    }
+def x_search_api():
+    q = request.args.get("q", "")
+    async def get_x():
+        html, base = await x_fetch("/search?f=tweets&q=" + urllib.parse.quote(q))
+        return {"query": q, "tweets": parse_x_tweets(html, base)}
+    
+    return run_async(get_x())
 
-@app.get("/x/search", response_class=HTMLResponse)
-async def x_search_page(request: Request, q: str):
-    data = await x_search_api(q)
-    return templates.TemplateResponse(
+@app.route("/x/search")
+def x_search_page():
+    q = request.args.get("q", "")
+    # APIルートの関数を内部的に呼ぶ
+    async def get_x():
+        html, base = await x_fetch("/search?f=tweets&q=" + urllib.parse.quote(q))
+        return parse_x_tweets(html, base)
+    
+    tweets = run_async(get_x())
+    return render_template(
         "x_search.html",
-        {
-            "request": request,
-            "query": q,
-            "tweets": data["tweets"],
-        }
+        query=q,
+        tweets=tweets,
     )
 
 # ============================================================
-# ★★★ X メディア完全プロキシ（localhost不可）★★★
+# ★★★ X メディアプロキシ ★★★
 # ============================================================
 
-@app.get("/x/media")
-async def x_media_proxy(u: str):
+@app.route("/x/media")
+def x_media_proxy():
+    u = request.args.get("u")
     url = decode_media_url(u)
 
     if not url.startswith("https://"):
-        raise HTTPException(status_code=400)
+        abort(400)
 
-    async with httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}, timeout=5) as client:
-        r = await client.get(url)
-        r.raise_for_status()
+    async def fetch_media():
+        async with httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0"}, timeout=5) as client:
+            r = await client.get(url)
+            r.raise_for_status()
+            return r.content, r.headers.get("content-type", "application/octet-stream")
 
-    return Response(
-        content=r.content,
-        media_type=r.headers.get("content-type", "application/octet-stream")
-    )
+    content, mime = run_async(fetch_media())
+    return FlaskResponse(content, mimetype=mime)
+
+if __name__ == "__main__":
+    # Flaskの開発用サーバー。本番環境では Waitress や Gunicorn + Gevent を推奨
+    app.run(host="0.0.0.0", port=8000, debug=True)
