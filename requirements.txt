@@ -1,7 +1,6 @@
-fastapi
-uvicorn[standard]
-requests
+flask
+flask-compress
+httpx
 jinja2
 beautifulsoup4
 lxml
-httpx
